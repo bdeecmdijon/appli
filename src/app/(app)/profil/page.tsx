@@ -10,6 +10,11 @@ import CouponFlow, { type CouponAssignment } from '@/components/CouponFlow'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+interface CouponRow extends CouponAssignment {
+  status:  'pending' | 'used'
+  used_at: string | null
+}
+
 interface Profile {
   full_name:      string | null
   email:          string
@@ -232,8 +237,8 @@ export default function ProfilPage() {
   const [editOpen,      setEditOpen]      = useState(false)
   const [saveToast,     setSaveToast]     = useState(false)
   const [qrOpen,        setQrOpen]        = useState(false)
-  const [coupons,       setCoupons]       = useState<CouponAssignment[]>([])
-  const [activeCoupon,  setActiveCoupon]  = useState<CouponAssignment | null>(null)
+  const [coupons,       setCoupons]       = useState<CouponRow[]>([])
+  const [activeCoupon,  setActiveCoupon]  = useState<CouponRow | null>(null)
 
   useEffect(() => {
     async function fetchProfile() {
@@ -296,19 +301,22 @@ export default function ProfilPage() {
         console.log('[ProfilPage] built profile → student_code:', built.student_code)
         setProfile(built)
 
-        // Coupons actifs (pending + non expirés)
-        const now = new Date().toISOString()
+        // Coupons : pending non expirés + utilisés il y a moins de 2h
+        const now2h = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        const nowIso = new Date().toISOString()
         const { data: assignData } = await supabase
           .from('coupon_assignments')
-          .select('id, coupon_id, status, coupons(emoji, title, description, available_from, expires_at)')
+          .select('id, coupon_id, status, used_at, coupons(emoji, title, description, available_from, expires_at)')
           .eq('user_id', user.id)
-          .eq('status', 'pending')
+          .or(`status.eq.pending,and(status.eq.used,used_at.gt.${now2h})`)
 
         if (assignData) {
-          const active = assignData
+          const rows = assignData
             .filter((a: Record<string, unknown>) => {
               const c = a.coupons as { expires_at: string } | null
-              return c && c.expires_at > now
+              // Exclure les pending expirés (les used restent visibles 2h peu importe expires_at)
+              if (a.status === 'pending') return c && c.expires_at > nowIso
+              return true
             })
             .map((a: Record<string, unknown>) => {
               const c = a.coupons as { emoji: string; title: string; description: string | null; available_from: string; expires_at: string }
@@ -319,9 +327,11 @@ export default function ProfilPage() {
                 description:    c.description,
                 available_from: c.available_from,
                 expires_at:     c.expires_at,
+                status:         a.status as 'pending' | 'used',
+                used_at:        (a.used_at as string | null) ?? null,
               }
             })
-          setCoupons(active)
+          setCoupons(rows)
         }
       } catch (err: unknown) {
         const e = err as Record<string, unknown>
@@ -555,44 +565,80 @@ export default function ProfilPage() {
             <div className="space-y-2.5">
               {coupons.map(coupon => {
                 const now       = new Date()
-                const available = new Date(coupon.available_from) <= now
+                const isUsed    = coupon.status === 'used'
+                const isLocked  = !isUsed && new Date(coupon.available_from) > now
+
+                if (isUsed) {
+                  // État UTILISÉ — grayed, badge vert, heure d'utilisation
+                  const usedTime = coupon.used_at
+                    ? new Date(coupon.used_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                    : null
+                  return (
+                    <div
+                      key={coupon.id}
+                      className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}
+                    >
+                      <span className="text-2xl flex-shrink-0 opacity-50">{coupon.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate text-gray-400">{coupon.title}</p>
+                        {usedTime && (
+                          <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
+                            Utilisé à {usedTime}
+                          </span>
+                        )}
+                      </div>
+                      <span className="flex-shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
+                        ✓ Utilisé
+                      </span>
+                    </div>
+                  )
+                }
+
+                if (isLocked) {
+                  // État VERROUILLÉ — grayed, 🔒, date de disponibilité
+                  const availDate = new Date(coupon.available_from).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+                  const availTime = new Date(coupon.available_from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                  return (
+                    <div
+                      key={coupon.id}
+                      className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}
+                    >
+                      <span className="text-2xl flex-shrink-0 opacity-40">{coupon.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate text-gray-400">{coupon.title}</p>
+                        <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
+                          Disponible le {availDate} à {availTime}
+                        </span>
+                      </div>
+                      <span className="flex-shrink-0 text-base px-2 opacity-50">🔒</span>
+                    </div>
+                  )
+                }
+
+                // État DISPONIBLE — coloré, valable jusqu'à, bouton Utiliser
+                const expiresTime = new Date(coupon.expires_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
                 return (
                   <div
                     key={coupon.id}
                     className="flex items-center gap-3 p-3 rounded-xl"
-                    style={{
-                      backgroundColor: available ? '#E8622A08' : '#F9FAFB',
-                      border: `1px solid ${available ? '#E8622A25' : '#E5E7EB'}`,
-                    }}
+                    style={{ backgroundColor: '#E8622A08', border: '1px solid #E8622A25' }}
                   >
                     <span className="text-2xl flex-shrink-0">{coupon.emoji}</span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate" style={{ color: '#1D3550' }}>
-                        {coupon.title}
-                      </p>
-                      {available ? (
-                        <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5" style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
-                          Disponible
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
-                          Dispo le {new Date(coupon.available_from).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à {new Date(coupon.available_from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      )}
-                    </div>
-                    {available ? (
-                      <button
-                        onClick={() => setActiveCoupon(coupon)}
-                        className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white transition active:scale-[0.96]"
-                        style={{ backgroundColor: '#E8622A' }}
-                      >
-                        Utiliser
-                      </button>
-                    ) : (
-                      <span className="flex-shrink-0 text-xs font-semibold text-gray-400 px-3 py-2 rounded-xl bg-gray-100">
-                        Bientôt
+                      <p className="text-sm font-bold truncate" style={{ color: '#1D3550' }}>{coupon.title}</p>
+                      <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
+                        Valable jusqu&apos;à {expiresTime}
                       </span>
-                    )}
+                    </div>
+                    <button
+                      onClick={() => setActiveCoupon(coupon)}
+                      className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white transition active:scale-[0.96]"
+                      style={{ backgroundColor: '#E8622A' }}
+                    >
+                      Utiliser
+                    </button>
                   </div>
                 )
               })}
