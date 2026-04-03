@@ -6,11 +6,12 @@ import { QRCodeSVG } from 'qrcode.react'
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export interface Reward {
-  id:          string
-  emoji:       string
-  name:        string
-  description: string | null
-  points_cost: number
+  id:              string
+  level:           number | null
+  emoji:           string
+  name:            string
+  description:     string | null
+  points_required: number
 }
 
 interface RedemptionFlowProps {
@@ -109,7 +110,7 @@ export default function RedemptionFlow({ reward, onClose, onSuccess }: Redemptio
               className="inline-flex items-center gap-1 mt-3 px-4 py-1.5 rounded-full text-sm font-bold text-white"
               style={{ backgroundColor: '#E8622A' }}
             >
-              {reward.points_cost} pts
+              {reward.points_required} pts
             </div>
           </div>
 
