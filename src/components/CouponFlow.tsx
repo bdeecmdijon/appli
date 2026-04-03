@@ -71,6 +71,7 @@ export default function CouponFlow({ assignment, onClose }: CouponFlowProps) {
           : data.error === 'not_yet_available'? 'Ce coupon n\'est pas encore disponible.'
           : data.error === 'not_found'        ? 'Coupon introuvable.'
           : data.error === 'unauthorized'     ? 'Non autorisé.'
+          : data.error === 'out_of_stock'     ? 'Le stock de ce coupon est épuisé.'
           : 'Une erreur est survenue.'
         setError(msg)
         setStage('error')

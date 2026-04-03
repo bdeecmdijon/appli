@@ -11,8 +11,10 @@ import CouponFlow, { type CouponAssignment } from '@/components/CouponFlow'
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface CouponRow extends CouponAssignment {
-  status:  'pending' | 'used'
-  used_at: string | null
+  status:     'pending' | 'used'
+  used_at:    string | null
+  quantity:   number | null
+  used_count: number
 }
 
 interface Profile {
@@ -302,24 +304,37 @@ export default function ProfilPage() {
         setProfile(built)
 
         // Coupons : pending non expirés + utilisés il y a moins de 2h
-        const now2h = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        const now2h  = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
         const nowIso = new Date().toISOString()
         const { data: assignData } = await supabase
           .from('coupon_assignments')
-          .select('id, coupon_id, status, used_at, coupons(emoji, title, description, available_from, expires_at)')
+          .select('id, coupon_id, status, used_at, coupons(emoji, title, description, available_from, expires_at, quantity)')
           .eq('user_id', user.id)
           .or(`status.eq.pending,and(status.eq.used,used_at.gt.${now2h})`)
 
-        if (assignData) {
+        if (assignData && assignData.length > 0) {
+          // Récupère les counts d'utilisation globaux pour ces coupons
+          const couponIds = assignData.map((a: Record<string, unknown>) => a.coupon_id as string)
+          const { data: usedData } = await supabase
+            .from('coupon_assignments')
+            .select('coupon_id')
+            .in('coupon_id', couponIds)
+            .eq('status', 'used')
+
+          const usedCountMap: Record<string, number> = {}
+          for (const row of usedData ?? []) {
+            const cid = (row as { coupon_id: string }).coupon_id
+            usedCountMap[cid] = (usedCountMap[cid] ?? 0) + 1
+          }
+
           const rows = assignData
             .filter((a: Record<string, unknown>) => {
               const c = a.coupons as { expires_at: string } | null
-              // Exclure les pending expirés (les used restent visibles 2h peu importe expires_at)
               if (a.status === 'pending') return c && c.expires_at > nowIso
               return true
             })
             .map((a: Record<string, unknown>) => {
-              const c = a.coupons as { emoji: string; title: string; description: string | null; available_from: string; expires_at: string }
+              const c = a.coupons as { emoji: string; title: string; description: string | null; available_from: string; expires_at: string; quantity: number | null }
               return {
                 id:             a.id as string,
                 emoji:          c.emoji,
@@ -329,6 +344,8 @@ export default function ProfilPage() {
                 expires_at:     c.expires_at,
                 status:         a.status as 'pending' | 'used',
                 used_at:        (a.used_at as string | null) ?? null,
+                quantity:       c.quantity,
+                used_count:     usedCountMap[a.coupon_id as string] ?? 0,
               }
             })
           setCoupons(rows)
@@ -564,9 +581,10 @@ export default function ProfilPage() {
           ) : (
             <div className="space-y-2.5">
               {coupons.map(coupon => {
-                const now       = new Date()
-                const isUsed    = coupon.status === 'used'
-                const isLocked  = !isUsed && new Date(coupon.available_from) > now
+                const now           = new Date()
+                const isUsed        = coupon.status === 'used'
+                const isOutOfStock  = !isUsed && coupon.quantity !== null && coupon.used_count >= coupon.quantity
+                const isLocked      = !isUsed && !isOutOfStock && new Date(coupon.available_from) > now
 
                 if (isUsed) {
                   // État UTILISÉ — grayed, badge vert, heure d'utilisation
@@ -590,6 +608,28 @@ export default function ProfilPage() {
                       </div>
                       <span className="flex-shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
                         ✓ Utilisé
+                      </span>
+                    </div>
+                  )
+                }
+
+                if (isOutOfStock) {
+                  // État STOCK ÉPUISÉ — grayed, badge rouge
+                  return (
+                    <div
+                      key={coupon.id}
+                      className="flex items-center gap-3 p-3 rounded-xl"
+                      style={{ backgroundColor: '#F9FAFB', border: '1px solid #E5E7EB' }}
+                    >
+                      <span className="text-2xl flex-shrink-0 opacity-40">{coupon.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold truncate text-gray-400">{coupon.title}</p>
+                        <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
+                          Stock épuisé
+                        </span>
+                      </div>
+                      <span className="flex-shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full" style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}>
+                        Épuisé
                       </span>
                     </div>
                   )

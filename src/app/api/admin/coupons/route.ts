@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from '@/lib/supabase-server'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { emoji, title, description, available_from, expires_at, target, recipient_ids } = body
+    const { emoji, title, description, available_from, expires_at, target, recipient_ids, quantity } = body
 
     if (!title?.trim() || !available_from || !expires_at) {
       return NextResponse.json({ error: 'Champs obligatoires : title, available_from, expires_at' }, { status: 400 })
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
         available_from,
         expires_at,
         target:         target ?? 'all',
+        quantity:       typeof quantity === 'number' ? quantity : null,
         created_by:     user.id,
       })
       .select('id')

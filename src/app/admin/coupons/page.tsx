@@ -13,6 +13,7 @@ interface Coupon {
   available_from: string
   expires_at:     string
   target:         'all' | 'specific'
+  quantity:       number | null
   created_at:     string
   coupon_assignments: { id: string; status: string }[]
 }
@@ -91,6 +92,10 @@ function CouponModal({
   const [endDate,        setEndDate]   = useState(isEdit ? isoToDate(coupon.expires_at) : '')
   const [endTime,        setEndTime]   = useState(isEdit ? isoToTime(coupon.expires_at) : '02:00')
 
+  // Quantité
+  const [unlimited, setUnlimited] = useState(isEdit ? coupon.quantity === null : true)
+  const [quantity,  setQuantity]  = useState(isEdit && coupon.quantity !== null ? String(coupon.quantity) : '')
+
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState<string | null>(null)
 
@@ -141,6 +146,7 @@ function CouponModal({
     setError(null)
 
     if (isEdit) {
+      const quantityValue = unlimited ? null : (parseInt(quantity) || null)
       const { error: upErr } = await supabase
         .from('coupons')
         .update({
@@ -149,6 +155,7 @@ function CouponModal({
           description:    description.trim() || null,
           available_from: availFrom,
           expires_at:     expiresAt,
+          quantity:       quantityValue,
         })
         .eq('id', coupon.id)
 
@@ -159,6 +166,7 @@ function CouponModal({
 
     // Création via API route
     const { data: { user } } = await supabase.auth.getUser()
+    const quantityValue = unlimited ? null : (parseInt(quantity) || null)
     const res = await fetch('/api/admin/coupons', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -169,6 +177,7 @@ function CouponModal({
         available_from: availFrom,
         expires_at:     expiresAt,
         target,
+        quantity:       quantityValue,
         recipient_ids:  target === 'specific' ? Array.from(selectedIds) : undefined,
         _userId: user?.id,
       }),
@@ -279,6 +288,33 @@ function CouponModal({
                   style={{ color: '#1D3550' }}
                 />
               </div>
+            </div>
+
+            {/* Quantité */}
+            <div>
+              <label className="text-xs font-semibold text-gray-500 mb-2 block">
+                Nombre de coupons disponibles
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer mb-2">
+                <input
+                  type="checkbox"
+                  checked={unlimited}
+                  onChange={e => setUnlimited(e.target.checked)}
+                  className="w-4 h-4 accent-orange-500"
+                />
+                <span className="text-sm" style={{ color: '#1D3550' }}>Illimité</span>
+              </label>
+              {!unlimited && (
+                <input
+                  type="number"
+                  min={1}
+                  value={quantity}
+                  onChange={e => setQuantity(e.target.value)}
+                  placeholder="ex : 50"
+                  className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#E8622A]"
+                  style={{ color: '#1D3550' }}
+                />
+              )}
             </div>
 
             {/* Destinataires (création uniquement) */}
@@ -599,9 +635,20 @@ export default function CouponsAdminPage() {
                           <span className="font-medium text-gray-600">Destinataires : </span>
                           {coupon.target === 'all' ? 'Tous' : `${total} personne${total > 1 ? 's' : ''}`}
                           {' · '}
-                          <span style={{ color: '#16A34A' }}>{used} utilisé{used > 1 ? 's' : ''}</span>
-                          {' / '}
-                          {total}
+                          {coupon.quantity !== null ? (
+                            <>
+                              <span style={{ color: used >= coupon.quantity ? '#DC2626' : '#16A34A' }}>
+                                {used}/{coupon.quantity} utilisé{used > 1 ? 's' : ''}
+                              </span>
+                              {used >= coupon.quantity && (
+                                <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}>
+                                  Stock épuisé
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span style={{ color: '#16A34A' }}>{used} utilisé{used > 1 ? 's' : ''} (illimité)</span>
+                          )}
                         </p>
                       </div>
                     </div>
