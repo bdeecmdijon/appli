@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { Trophy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import SplashScreen from '@/components/SplashScreen'
 
 const navItems = [
   {
@@ -57,8 +58,17 @@ const navItems = [
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const pathname  = usePathname()
-  const [hasUnread, setHasUnread] = useState(false)
+  const pathname    = usePathname()
+  const [hasUnread,   setHasUnread]   = useState(false)
+  const [showSplash,  setShowSplash]  = useState(false)
+
+  useEffect(() => {
+    // Affiche le splash une seule fois par session
+    if (!sessionStorage.getItem('splash_shown')) {
+      sessionStorage.setItem('splash_shown', '1')
+      setShowSplash(true)
+    }
+  }, [])
 
   useEffect(() => {
     const onAccueil = pathname === '/accueil' || pathname.startsWith('/accueil/')
@@ -84,6 +94,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+
       <main className="flex-1 pb-20 overflow-y-auto">
         {children}
       </main>
