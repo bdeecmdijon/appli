@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CalendarSection from '@/components/CalendarSection'
 
@@ -218,42 +218,52 @@ export default function AccueilPage() {
   const prevTierRef   = useRef<number | null>(null)
   const initialLoaded = useRef(false)
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
+  const fetchData = useCallback(async (showLoading = false) => {
+    if (showLoading) setLoading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
 
-        if (user) {
-          const { data: profileData, error: profileErr } = await supabase
-            .from('profiles')
-            .select('id, full_name, points_balance')
-            .eq('id', user.id)
-            .single()
-          if (profileErr) throw profileErr
-          setProfile(profileData ?? MOCK_PROFILE)
-        } else {
-          setProfile(MOCK_PROFILE)
-        }
-
-        const { data: eventsData, error: eventsErr } = await supabase
-          .from('events')
-          .select('id, title, starts_at, location, cover_url')
-          .gt('starts_at', new Date().toISOString())
-          .order('starts_at', { ascending: true })
-          .limit(3)
-        if (eventsErr) throw eventsErr
-        setEvents(eventsData && eventsData.length > 0 ? eventsData : MOCK_EVENTS)
-      } catch (err) {
-        console.error(err)
-        setError('Données de démonstration affichées.')
+      if (user) {
+        const { data: profileData, error: profileErr } = await supabase
+          .from('profiles')
+          .select('id, full_name, points_balance')
+          .eq('id', user.id)
+          .single()
+        if (profileErr) throw profileErr
+        setProfile(profileData ?? MOCK_PROFILE)
+      } else {
         setProfile(MOCK_PROFILE)
-        setEvents(MOCK_EVENTS)
-      } finally {
-        setLoading(false)
       }
+
+      const { data: eventsData, error: eventsErr } = await supabase
+        .from('events')
+        .select('id, title, starts_at, location, cover_url')
+        .gt('starts_at', new Date().toISOString())
+        .order('starts_at', { ascending: true })
+        .limit(3)
+      if (eventsErr) throw eventsErr
+      setEvents(eventsData && eventsData.length > 0 ? eventsData : MOCK_EVENTS)
+    } catch (err) {
+      console.error(err)
+      setError('Données de démonstration affichées.')
+      setProfile(MOCK_PROFILE)
+      setEvents(MOCK_EVENTS)
+    } finally {
+      setLoading(false)
     }
-    fetchData()
   }, [])
+
+  // Chargement initial
+  useEffect(() => { fetchData(true) }, [fetchData])
+
+  // Rafraîchit le solde quand l'utilisateur revient sur la page (après la roue)
+  useEffect(() => {
+    function handleVisible() {
+      if (document.visibilityState === 'visible') fetchData(false)
+    }
+    document.addEventListener('visibilitychange', handleVisible)
+    return () => document.removeEventListener('visibilitychange', handleVisible)
+  }, [fetchData])
 
   // ── Détection changement de palier ──────────────────────────────────────
 

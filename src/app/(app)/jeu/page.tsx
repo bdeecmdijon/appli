@@ -40,6 +40,35 @@ function storeUnlock(code: string) {
   localStorage.setItem(LOCK_KEY, JSON.stringify({ code, unlockedAt: Date.now() }))
 }
 
+// ── Attribution de points ─────────────────────────────────────────────────
+
+async function awardPoints(userId: string, pts: number): Promise<boolean> {
+  try {
+    const { data: profile, error: fetchErr } = await supabase
+      .from('profiles')
+      .select('points_balance')
+      .eq('id', userId)
+      .single()
+    if (fetchErr || !profile) return false
+
+    const newBalance = (profile.points_balance ?? 0) + pts
+
+    const { error: updateErr } = await supabase
+      .from('profiles')
+      .update({ points_balance: newBalance })
+      .eq('id', userId)
+    if (updateErr) return false
+
+    await supabase
+      .from('points_history')
+      .insert({ user_id: userId, amount: pts, reason: 'Roue de la chance' })
+
+    return true
+  } catch {
+    return false
+  }
+}
+
 // ── Validation Supabase ───────────────────────────────────────────────────
 
 async function validateCode(code: string): Promise<{ valid: boolean; label?: string }> {
@@ -296,16 +325,17 @@ function LockScreen({ onUnlock }: { onUnlock: () => void }) {
 
 // ── Roue de la fortune ─────────────────────────────────────────────────────
 
-function WheelGame() {
+function WheelGame({ userId }: { userId: string }) {
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const rafRef       = useRef<number | null>(null)
   const startTimeRef = useRef<number | null>(null)
   const rotationRef  = useRef(0)
 
-  const [spinning,  setSpinning]  = useState(false)
-  const [result,    setResult]    = useState<typeof SEGMENTS[number] | null>(null)
-  const [showModal, setShowModal] = useState(false)
-  const [size,      setSize]      = useState(280)
+  const [spinning,     setSpinning]     = useState(false)
+  const [result,       setResult]       = useState<typeof SEGMENTS[number] | null>(null)
+  const [showModal,    setShowModal]    = useState(false)
+  const [awardStatus,  setAwardStatus]  = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [size,         setSize]         = useState(280)
 
   useEffect(() => {
     function resize() { setSize(Math.min(window.innerWidth - 80, 320)) }
@@ -323,7 +353,7 @@ function WheelGame() {
 
   function spin() {
     if (spinning) return
-    setResult(null); setShowModal(false)
+    setResult(null); setShowModal(false); setAwardStatus('idle')
     const winIndex    = Math.floor(Math.random() * TOTAL)
     const targetAngle = -(winIndex * SLICE_ANGLE + SLICE_ANGLE / 2) + Math.PI / 2
     const extraSpins  = (5 + Math.floor(Math.random() * 3)) * 2 * Math.PI
@@ -346,6 +376,10 @@ function WheelGame() {
         if (SEGMENTS[winIndex].pts > 0) {
           import('canvas-confetti').then(({ default: confetti }) => {
             confetti({ particleCount: 80, spread: 60, origin: { y: 0.5 }, colors: ['#E8622A', '#FFD700', '#ffffff'] })
+          })
+          setAwardStatus('loading')
+          awardPoints(userId, SEGMENTS[winIndex].pts).then(ok => {
+            setAwardStatus(ok ? 'success' : 'error')
           })
         }
       }
@@ -413,7 +447,15 @@ function WheelGame() {
               </h2>
               <p className="text-2xl font-extrabold mb-1" style={{ color: result.color }}>{result.label}</p>
               <p className="text-sm text-gray-400 mb-6">
-                {result.pts > 0 ? `${result.pts} points seront bientôt crédités sur ton compte.` : 'Reviens demain pour retenter ta chance !'}
+                {result.pts > 0
+                  ? awardStatus === 'loading'
+                    ? 'Crédit des points en cours…'
+                    : awardStatus === 'success'
+                    ? `+${result.pts} points crédités sur ton compte !`
+                    : awardStatus === 'error'
+                    ? 'Erreur lors du crédit — contacte le BDE.'
+                    : `+${result.pts} points`
+                  : 'Reviens demain pour retenter ta chance !'}
               </p>
               <button onClick={() => setShowModal(false)}
                 className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98]"
@@ -435,9 +477,13 @@ function JeuPageInner() {
   const searchParams = useSearchParams()
   const [unlocked, setUnlocked] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [userId,   setUserId]   = useState<string | null>(null)
 
   useEffect(() => {
     async function check() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+
       const code = searchParams.get('code')
       if (code) {
         const { valid } = await validateCode(code)
@@ -464,8 +510,8 @@ function JeuPageInner() {
     )
   }
 
-  return unlocked
-    ? <WheelGame />
+  return unlocked && userId
+    ? <WheelGame userId={userId} />
     : <LockScreen onUnlock={() => setUnlocked(true)} />
 }
 
