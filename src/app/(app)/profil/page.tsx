@@ -449,21 +449,6 @@ export default function ProfilPage() {
             {profile?.full_name ? 'Modifier' : 'Compléter le profil'}
           </button>
 
-          {/* Bouton QR Code */}
-          {profile?.student_code && (
-            <button
-              onClick={() => setQrOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition active:scale-[0.95]"
-              style={{ backgroundColor: '#E8622A', color: '#ffffff' }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
-              </svg>
-              Mon QR Code
-            </button>
-          )}
-
           {/* Bouton Admin (visible uniquement si role === 'admin') */}
           {profile?.role === 'admin' && (
             <Link
@@ -527,37 +512,33 @@ export default function ProfilPage() {
           </div>
         </div>
 
-        {/* Code étudiant */}
-        {profile?.student_code && (
-          <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">Mon code étudiant</p>
-            <div className="flex flex-col items-center gap-3">
-              <div
-                className="p-3 rounded-2xl"
-                style={{ backgroundColor: '#1D3550' + '08', border: '1px solid ' + '#1D3550' + '15' }}
+        {/* Code fidélité */}
+        <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Mon code fidélité</p>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <span
+                className="text-2xl font-extrabold tracking-widest"
+                style={{ color: '#E8622A', fontFamily: 'monospace' }}
               >
-                <QRCodeSVG
-                  value={profile.student_code}
-                  size={150}
-                  fgColor="#1D3550"
-                  bgColor="transparent"
-                  level="M"
-                />
-              </div>
-              <div className="flex flex-col items-center gap-1">
-                <span
-                  className="text-2xl font-extrabold tracking-widest"
-                  style={{ color: '#E8622A', fontFamily: 'monospace' }}
-                >
-                  {profile.student_code}
-                </span>
-                <p className="text-xs text-gray-400 text-center">
-                  Présente ce code aux événements BDE
-                </p>
-              </div>
+                {profile?.student_code ?? '—'}
+              </span>
+              <p className="text-xs text-gray-400 mt-1">Présente ce code aux événements BDE</p>
             </div>
+            <button
+              onClick={() => setQrOpen(true)}
+              disabled={!profile?.student_code}
+              className="flex flex-col items-center gap-1 px-4 py-3 rounded-2xl flex-shrink-0 transition active:scale-[0.96] disabled:opacity-40"
+              style={{ backgroundColor: '#1D355008', border: '1px solid #1D355015' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#1D3550" strokeWidth={1.8} className="w-7 h-7">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+              </svg>
+              <span className="text-[10px] font-bold" style={{ color: '#1D3550' }}>QR Code</span>
+            </button>
           </div>
-        )}
+        </div>
 
         {/* Stats */}
         <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5">

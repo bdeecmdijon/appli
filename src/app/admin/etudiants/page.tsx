@@ -90,6 +90,7 @@ function StudentModal({
 
   async function handleSave() {
     if (!effectiveAmount || effectiveAmount === 0) return
+    if (!reason.trim()) return
     setSaving(true)
 
     const { data: { user } } = await supabase.auth.getUser()
@@ -245,7 +246,7 @@ function StudentModal({
               type="text"
               value={reason}
               onChange={e => setReason(e.target.value)}
-              placeholder="Raison (ex: Participation soirée, Pénalité…)"
+              placeholder="Raison (obligatoire)"
               className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#E8622A] transition mb-3"
               style={{ color: '#1D3550' }}
             />
@@ -268,7 +269,7 @@ function StudentModal({
 
             <button
               onClick={handleSave}
-              disabled={saving || effectiveAmount === 0}
+              disabled={saving || effectiveAmount === 0 || !reason.trim()}
               className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
               style={{ backgroundColor: '#E8622A' }}
             >
@@ -313,6 +314,90 @@ function StudentModal({
             )}
           </div>
         </div>
+      </div>
+    </>
+  )
+}
+
+// ── Composant Saisie manuelle ──────────────────────────────────────────────
+
+function ManualCodeModal({
+  onClose,
+  onStudentFound,
+}: {
+  onClose: () => void
+  onStudentFound: (s: Student) => void
+}) {
+  const [code,    setCode]    = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = code.trim().toUpperCase()
+    if (!trimmed) return
+    setLoading(true)
+    setError(null)
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at')
+      .eq('student_code', trimmed)
+      .single()
+
+    if (data) {
+      onClose()
+      onStudentFound(data as Student)
+    } else {
+      setError(`Aucun étudiant trouvé pour le code « ${trimmed} »`)
+      setLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+      <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl shadow-2xl p-6 lg:inset-auto lg:left-1/2 lg:-translate-x-1/2 lg:w-96">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-extrabold" style={{ color: '#1D3550' }}>Saisir un code étudiant</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center bg-gray-100">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2.5} className="w-4 h-4">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSearch} className="space-y-3">
+          <input
+            type="text"
+            value={code}
+            onChange={e => { setCode(e.target.value); setError(null) }}
+            placeholder="ECM-XXXXXX"
+            autoFocus
+            autoCapitalize="characters"
+            className="w-full h-12 px-4 rounded-xl border border-gray-200 text-base font-bold outline-none focus:border-[#E8622A] transition"
+            style={{ color: '#E8622A', fontFamily: 'monospace', letterSpacing: '0.05em' }}
+          />
+
+          {error && (
+            <div className="rounded-xl px-4 py-3 bg-red-50 border border-red-100">
+              <p className="text-sm text-red-600 font-medium">{error}</p>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading || !code.trim()}
+            className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+            style={{ backgroundColor: '#E8622A' }}
+          >
+            {loading ? (
+              <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Recherche…</>
+            ) : (
+              'Rechercher'
+            )}
+          </button>
+        </form>
       </div>
     </>
   )
@@ -421,6 +506,7 @@ export default function EtudiantsPage() {
   const [sortDir,      setSortDir]      = useState<SortDir>('asc')
   const [selected,     setSelected]     = useState<Student | null>(null)
   const [scannerOpen,  setScannerOpen]  = useState(false)
+  const [codeModalOpen, setCodeModalOpen] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -505,17 +591,32 @@ export default function EtudiantsPage() {
             <h1 className="text-2xl font-extrabold text-white mt-0.5">Étudiants</h1>
             <p className="text-sm text-white/40 mt-0.5">{total} étudiant{total !== 1 ? 's' : ''} au total</p>
           </div>
-          <button
-            onClick={() => setScannerOpen(true)}
-            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1 transition active:scale-[0.93]"
-            style={{ backgroundColor: '#E8622A' }}
-            aria-label="Scanner QR code"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-5 h-5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
-            </svg>
-          </button>
+          <div className="flex gap-2 mt-1">
+            {/* Bouton saisie manuelle */}
+            <button
+              onClick={() => setCodeModalOpen(true)}
+              className="h-11 px-3 rounded-2xl flex items-center gap-1.5 flex-shrink-0 transition active:scale-[0.93] text-xs font-bold"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: 'white' }}
+              aria-label="Saisir un code"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487z" />
+              </svg>
+              Code
+            </button>
+            {/* Bouton scanner */}
+            <button
+              onClick={() => setScannerOpen(true)}
+              className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition active:scale-[0.93]"
+              style={{ backgroundColor: '#E8622A' }}
+              aria-label="Scanner QR code"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Barre de recherche */}
@@ -527,7 +628,7 @@ export default function EtudiantsPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher par code (ECM-XXXXX) ou nom…"
+            placeholder="Rechercher par nom, email ou code (ECM-XXXXX)…"
             className="w-full h-11 pl-10 pr-4 rounded-xl text-sm outline-none"
             style={{
               backgroundColor: 'rgba(255,255,255,0.12)',
@@ -659,6 +760,14 @@ export default function EtudiantsPage() {
         <QrScanModal
           onClose={() => setScannerOpen(false)}
           onStudentFound={(s) => { setScannerOpen(false); setSelected(s) }}
+        />
+      )}
+
+      {/* Saisie manuelle code */}
+      {codeModalOpen && (
+        <ManualCodeModal
+          onClose={() => setCodeModalOpen(false)}
+          onStudentFound={(s) => { setCodeModalOpen(false); setSelected(s) }}
         />
       )}
     </div>
