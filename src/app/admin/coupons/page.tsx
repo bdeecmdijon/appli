@@ -397,7 +397,7 @@ function AssignmentsModal({
       .eq('coupon_id', coupon.id)
       .order('status')
       .then(({ data }) => {
-        setAssignments((data ?? []) as AssignmentRow[])
+        setAssignments((data ?? []) as unknown as AssignmentRow[])
         setLoading(false)
       })
   }, [coupon.id])
