@@ -63,42 +63,14 @@ export default function NotificationsPage() {
     if (!title.trim() || !message.trim()) { setError('Titre et message sont obligatoires.'); return }
     setSending(true); setError(null)
 
-    const appId  = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID
-    const apiKey = process.env.NEXT_PUBLIC_ONESIGNAL_REST_API_KEY
-
-    if (!appId || !apiKey) {
-      setError('Clés OneSignal non configurées (NEXT_PUBLIC_ONESIGNAL_APP_ID / NEXT_PUBLIC_ONESIGNAL_REST_API_KEY).')
-      setSending(false); return
-    }
-
     try {
-      const res = await fetch('https://onesignal.com/api/v1/notifications', {
+      const res  = await fetch('/api/admin/send-notification', {
         method:  'POST',
-        headers: {
-          'Content-Type':  'application/json',
-          'Authorization': `Basic ${apiKey}`,
-        },
-        body: JSON.stringify({
-          app_id:             appId,
-          included_segments:  ['All'],
-          headings:  { fr: title.trim() },
-          contents:  { fr: message.trim() },
-          ...(eventId ? { url: `/accueil/${eventId}` } : {}),
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ title: title.trim(), message: message.trim(), eventId: eventId || null }),
       })
-
       const json = await res.json()
-      if (!res.ok) throw new Error(json.errors?.[0] ?? 'Erreur OneSignal')
-
-      // Historique
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('notifications_history').insert({
-        title:      title.trim(),
-        message:    message.trim(),
-        event_id:   eventId || null,
-        sent_by:    user?.id ?? null,
-        recipients: json.recipients ?? 0,
-      })
+      if (!res.ok || json.error) throw new Error(json.error ?? 'Erreur envoi')
 
       setTitle(''); setMessage(''); setEventId('')
       setSent(true)
