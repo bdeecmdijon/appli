@@ -448,8 +448,8 @@ export default function AccueilPage() {
           </div>
         )}
 
-        {/* ── Debug logs (dev uniquement) ── */}
-        {process.env.NODE_ENV === 'development' && debugLogs.length > 0 && (
+        {/* ── Debug logs (temporairement toujours visible) ── */}
+        {debugLogs.length > 0 && (
           <div className="rounded-xl p-3 space-y-0.5" style={{ backgroundColor: '#0F172A' }}>
             <p className="text-[10px] font-bold text-white/40 mb-1">DEBUG NOTIFICATIONS</p>
             {debugLogs.map((log, i) => (
