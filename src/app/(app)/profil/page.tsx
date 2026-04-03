@@ -419,15 +419,16 @@ export default function ProfilPage() {
       if (permission === 'granted') {
         const OneSignal = (await import('react-onesignal')).default
         await OneSignal.User.PushSubscription.optIn()
-        const sub     = OneSignal.User.PushSubscription
-        const optedIn = sub.optedIn
-        const id      = sub.id    ?? '(vide)'
-        const token   = sub.token ?? '(vide)'
-        addLog(`optedIn: ${optedIn}`)
-        addLog(`Subscription ID: ${id}`)
-        addLog(`Token: ${token.slice(0, 40)}…`)
-        console.log('[OneSignal] Subscription ID:', sub.id)
-        console.log('[OneSignal] Subscription token:', sub.token)
+        const sub    = OneSignal.User.PushSubscription
+        const userId = OneSignal.User.onesignalId
+        addLog(`optedIn: ${sub.optedIn}`)
+        addLog(`id: ${sub.id ?? 'null'}`)
+        addLog(`token: ${sub.token ? sub.token.substring(0, 20) + '...' : 'null'}`)
+        addLog(`OneSignal User ID: ${userId ?? 'null'}`)
+        console.log('[OneSignal] optedIn:', sub.optedIn)
+        console.log('[OneSignal] id:', sub.id)
+        console.log('[OneSignal] token:', sub.token)
+        console.log('[OneSignal] User ID:', userId)
         setNotifGranted(true)
       }
     } catch (err) {
