@@ -81,9 +81,9 @@ export default function ScannerPage() {
     <div className="min-h-screen flex flex-col bg-black">
       {/* ── Header ── */}
       <div className="px-5 pt-8 pb-4 bg-black">
-        <h1 className="text-xl font-extrabold text-white">Scanner QR récompense</h1>
+        <h1 className="text-xl font-extrabold text-white">Scanner un cadeau fidélité</h1>
         <p className="text-white/50 text-sm mt-0.5">
-          Scanne le QR code généré par l&apos;étudiant
+          Scannez le QR code de l&apos;étudiant pour valider sa récompense
         </p>
       </div>
 
@@ -95,22 +95,19 @@ export default function ScannerPage() {
             if (raw) handleScan(raw)
           }}
           constraints={{ facingMode: 'environment' }}
+          components={{ finder: false }}
           styles={{
             container: { width: '100%', height: '100%' },
             video:     { objectFit: 'cover' },
           }}
         />
-        {/* Viseur */}
+        {/* Viseur unique — coins oranges sur fond transparent */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-64 h-64 relative">
-            {[
-              'top-0 left-0 border-t-4 border-l-4 rounded-tl-2xl',
-              'top-0 right-0 border-t-4 border-r-4 rounded-tr-2xl',
-              'bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl',
-              'bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl',
-            ].map((cls, i) => (
-              <div key={i} className={`absolute w-10 h-10 ${cls}`} style={{ borderColor: '#E8622A' }} />
-            ))}
+            <div className="absolute top-0    left-0  w-10 h-10 border-t-4 border-l-4 rounded-tl-2xl" style={{ borderColor: '#E8622A' }} />
+            <div className="absolute top-0    right-0 w-10 h-10 border-t-4 border-r-4 rounded-tr-2xl" style={{ borderColor: '#E8622A' }} />
+            <div className="absolute bottom-0 left-0  w-10 h-10 border-b-4 border-l-4 rounded-bl-2xl" style={{ borderColor: '#E8622A' }} />
+            <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 rounded-br-2xl" style={{ borderColor: '#E8622A' }} />
           </div>
         </div>
       </div>
