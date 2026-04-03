@@ -46,6 +46,7 @@ export async function POST(req: Request) {
         app_id:            appId,
         included_segments: ['All'],
         headings:          { fr: title.trim(), en: title.trim() },
+        subtitle:          { fr: '', en: '' }, // supprime le "from BDE ECM Dijon" ajouté par OneSignal
         contents:          { fr: message.trim(), en: message.trim() },
       }
       if (eventId && origin) body.url = `${origin}/accueil/${eventId}`
