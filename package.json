@@ -20,7 +20,8 @@
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-easy-crop": "^5.5.7"
+    "react-easy-crop": "^5.5.7",
+    "react-onesignal": "^3.5.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
