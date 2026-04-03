@@ -290,14 +290,18 @@ export default function AccueilPage() {
 
   async function handleEnableNotifications() {
     try {
+      console.log('[Notif] Demande permission…')
       const permission = await Notification.requestPermission()
+      console.log('[Notif] permission:', permission)
       if (permission === 'granted') {
         const OneSignal = (await import('react-onesignal')).default
+        console.log('[Notif] optIn OneSignal…')
         await OneSignal.User.PushSubscription.optIn()
+        console.log('[Notif] optIn done — optedIn:', OneSignal.User.PushSubscription.optedIn)
         setNotificationsEnabled(true)
       }
     } catch (err) {
-      console.error('Erreur notifications:', err)
+      console.error('[Notif] Erreur:', err)
     }
   }
 
