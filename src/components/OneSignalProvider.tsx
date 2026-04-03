@@ -13,6 +13,9 @@ export default function OneSignalProvider() {
       oneSignalInitialized = true
 
       try {
+        // iOS utilise le push natif VAPID — pas besoin d'OneSignal
+        if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return
+
         const OneSignal = (await import('react-onesignal')).default
 
         await OneSignal.init({

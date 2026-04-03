@@ -407,6 +407,38 @@ export default function ProfilPage() {
     setNotifGranted(Notification.permission === 'granted')
   }, [])
 
+  function urlBase64ToUint8Array(base64: string) {
+    const padding = '='.repeat((4 - (base64.length % 4)) % 4)
+    const b64     = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const raw     = window.atob(b64)
+    return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+  }
+
+  async function registerNativePush() {
+    addLog('Enregistrement SW natif…')
+    const reg = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
+    addLog('SW prêt ✓')
+
+    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+    addLog('Abonnement PushManager…')
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+    })
+    addLog(`Endpoint: ${sub.endpoint.slice(0, 40)}…`)
+
+    const subJson = sub.toJSON()
+    const res = await fetch('/api/push/subscribe', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ subscription: { endpoint: sub.endpoint, keys: subJson.keys }, deviceType: 'ios' }),
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? 'Erreur sauvegarde subscription')
+    addLog('Subscription enregistrée ✓')
+  }
+
   async function handleNotifRequest() {
     try {
       const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -417,18 +449,18 @@ export default function ProfilPage() {
       addLog(`permission: ${permission}`)
 
       if (permission === 'granted') {
-        const OneSignal = (await import('react-onesignal')).default
-        await OneSignal.User.PushSubscription.optIn()
-        const sub    = OneSignal.User.PushSubscription
-        const userId = OneSignal.User.onesignalId
-        addLog(`optedIn: ${sub.optedIn}`)
-        addLog(`id: ${sub.id ?? 'null'}`)
-        addLog(`token: ${sub.token ? sub.token.substring(0, 20) + '...' : 'null'}`)
-        addLog(`OneSignal User ID: ${userId ?? 'null'}`)
-        console.log('[OneSignal] optedIn:', sub.optedIn)
-        console.log('[OneSignal] id:', sub.id)
-        console.log('[OneSignal] token:', sub.token)
-        console.log('[OneSignal] User ID:', userId)
+        if (isIOS) {
+          await registerNativePush()
+        } else {
+          const OneSignal = (await import('react-onesignal')).default
+          await OneSignal.User.PushSubscription.optIn()
+          const sub    = OneSignal.User.PushSubscription
+          const userId = OneSignal.User.onesignalId
+          addLog(`optedIn: ${sub.optedIn}`)
+          addLog(`id: ${sub.id ?? 'null'}`)
+          addLog(`token: ${sub.token ? sub.token.slice(0, 20) + '…' : 'null'}`)
+          addLog(`OneSignal User ID: ${userId ?? 'null'}`)
+        }
         setNotifGranted(true)
       }
     } catch (err) {
