@@ -240,13 +240,14 @@ function EditProfileSheet({
 
 export default function ProfilPage() {
   const router = useRouter()
-  const [profile,    setProfile]    = useState<Profile | null>(null)
-  const [userId,     setUserId]     = useState<string | null>(null)
-  const [loading,    setLoading]    = useState(true)
-  const [loggingOut, setLoggingOut] = useState(false)
-  const [editOpen,   setEditOpen]   = useState(false)
-  const [saveToast,  setSaveToast]  = useState(false)
+  const [profile,     setProfile]     = useState<Profile | null>(null)
+  const [userId,      setUserId]      = useState<string | null>(null)
+  const [loading,     setLoading]     = useState(true)
+  const [loggingOut,  setLoggingOut]  = useState(false)
+  const [editOpen,    setEditOpen]    = useState(false)
+  const [saveToast,   setSaveToast]   = useState(false)
   const [couponToast, setCouponToast] = useState(false)
+  const [qrOpen,      setQrOpen]      = useState(false)
 
   useEffect(() => {
     async function fetchProfile() {
@@ -448,6 +449,21 @@ export default function ProfilPage() {
             {profile?.full_name ? 'Modifier' : 'Compléter le profil'}
           </button>
 
+          {/* Bouton QR Code */}
+          {profile?.student_code && (
+            <button
+              onClick={() => setQrOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition active:scale-[0.95]"
+              style={{ backgroundColor: '#E8622A', color: '#ffffff' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+              </svg>
+              Mon QR Code
+            </button>
+          )}
+
           {/* Bouton Admin (visible uniquement si role === 'admin') */}
           {profile?.role === 'admin' && (
             <Link
@@ -635,6 +651,65 @@ export default function ProfilPage() {
           onClose={() => setEditOpen(false)}
           onSaved={handleSaved}
         />
+      )}
+
+      {/* Modal plein écran QR Code */}
+      {qrOpen && profile?.student_code && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-14 pb-4">
+            <h2 className="text-lg font-extrabold" style={{ color: '#1D3550' }}>Mon QR Code</h2>
+            <button
+              onClick={() => setQrOpen(false)}
+              className="w-10 h-10 rounded-full flex items-center justify-center"
+              style={{ backgroundColor: '#F3F4F6' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth={2.5} className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Contenu centré */}
+          <div className="flex-1 flex flex-col items-center justify-center px-8 gap-6">
+            <p className="text-sm text-gray-400 text-center">
+              Présente ce QR code à l&apos;entrée des événements BDE
+            </p>
+
+            <div className="p-6 rounded-3xl shadow-lg border border-gray-100 bg-white">
+              <QRCodeSVG
+                value={profile.student_code}
+                size={220}
+                fgColor="#1D3550"
+                bgColor="#FFFFFF"
+                level="M"
+              />
+            </div>
+
+            <div className="flex flex-col items-center gap-1">
+              <span
+                className="text-3xl font-extrabold tracking-widest"
+                style={{ color: '#E8622A', fontFamily: 'monospace' }}
+              >
+                {profile.student_code}
+              </span>
+              {profile.full_name && (
+                <p className="text-sm text-gray-400">{profile.full_name}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Bouton fermer bas */}
+          <div className="px-5 pb-10">
+            <button
+              onClick={() => setQrOpen(false)}
+              className="w-full h-13 rounded-2xl font-bold text-white transition active:scale-[0.98]"
+              style={{ backgroundColor: '#1D3550', height: '52px' }}
+            >
+              Fermer
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
