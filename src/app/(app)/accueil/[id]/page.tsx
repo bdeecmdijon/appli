@@ -146,6 +146,7 @@ interface Event {
   location: string | null
   description: string | null
   cover_url: string | null
+  video_url: string | null
   price_cents: number
 }
 
@@ -154,6 +155,7 @@ interface Event {
 const MOCK_EVENTS: Record<string, Event> = {
   '1': {
     id: '1',
+    video_url: null,
     title: 'Soirée de rentrée BDE',
     starts_at: '2026-04-12T21:00:00',
     ends_at: '2026-04-13T02:00:00',
@@ -164,6 +166,7 @@ const MOCK_EVENTS: Record<string, Event> = {
   },
   '2': {
     id: '2',
+    video_url: null,
     title: 'Tournoi de foot inter-promos',
     starts_at: '2026-04-18T14:00:00',
     ends_at: '2026-04-18T18:00:00',
@@ -174,6 +177,7 @@ const MOCK_EVENTS: Record<string, Event> = {
   },
   '3': {
     id: '3',
+    video_url: null,
     title: 'Conférence Entrepreneuriat',
     starts_at: '2026-04-25T18:30:00',
     ends_at: '2026-04-25T20:30:00',
@@ -256,16 +260,17 @@ function formatPrice(cents: number) {
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  const [event,   setEvent]   = useState<Event | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [copied,  setCopied]  = useState(false)
+  const [event,      setEvent]      = useState<Event | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [copied,     setCopied]     = useState(false)
+  const [videoOpen,  setVideoOpen]  = useState(false)
 
   useEffect(() => {
     async function fetchEvent() {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, starts_at, ends_at, location, description, cover_url, price_cents')
+          .select('id, title, starts_at, ends_at, location, description, cover_url, video_url, price_cents')
           .eq('id', id)
           .single()
 
@@ -427,6 +432,36 @@ export default function EventDetailPage() {
                 <p key={i} className="text-sm text-gray-600 leading-relaxed">{p}</p>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Vidéo */}
+        {event.video_url && (
+          <div>
+            <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Vidéo</h2>
+            {videoOpen ? (
+              <video
+                src={event.video_url}
+                controls
+                autoPlay
+                playsInline
+                className="w-full rounded-2xl bg-black"
+                style={{ maxHeight: '60vh' }}
+              />
+            ) : (
+              <button
+                onClick={() => setVideoOpen(true)}
+                className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-bold text-sm transition active:scale-[0.98] text-white"
+                style={{ background: 'linear-gradient(135deg, #1D3550 0%, #2E5A8A 100%)' }}
+              >
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-4 h-4 ml-0.5">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                Voir la vidéo
+              </button>
+            )}
           </div>
         )}
 

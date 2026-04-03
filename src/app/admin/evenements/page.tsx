@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Cropper from 'react-easy-crop'
+import type { Area } from 'react-easy-crop'
 import { supabase } from '@/lib/supabase'
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -45,6 +47,120 @@ function formatDate(iso: string) {
 function toDateInput(iso: string) { return iso.split('T')[0] }
 function toTimeInput(iso: string) { return iso.split('T')[1]?.slice(0, 5) ?? '' }
 
+async function getCroppedImg(imageSrc: string, pixelCrop: Area): Promise<File> {
+  const image = new window.Image()
+  image.src = imageSrc
+  await new Promise<void>(resolve => { image.onload = () => resolve() })
+
+  const canvas = document.createElement('canvas')
+  canvas.width  = pixelCrop.width
+  canvas.height = pixelCrop.height
+  const ctx = canvas.getContext('2d')!
+  ctx.drawImage(
+    image,
+    pixelCrop.x, pixelCrop.y, pixelCrop.width, pixelCrop.height,
+    0, 0, pixelCrop.width, pixelCrop.height,
+  )
+  return new Promise<File>((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) { reject(new Error('Canvas vide')); return }
+      resolve(new File([blob], 'cover_cropped.jpg', { type: 'image/jpeg' }))
+    }, 'image/jpeg', 0.92)
+  })
+}
+
+// ── Composant CropModal ───────────────────────────────────────────────────
+
+function CropModal({
+  src,
+  onConfirm,
+  onCancel,
+}: {
+  src:       string
+  onConfirm: (file: File, preview: string) => void
+  onCancel:  () => void
+}) {
+  const [crop,   setCrop]   = useState({ x: 0, y: 0 })
+  const [zoom,   setZoom]   = useState(1)
+  const [area,   setArea]   = useState<Area | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const onCropComplete = useCallback((_: Area, pixels: Area) => setArea(pixels), [])
+
+  async function handleConfirm() {
+    if (!area) return
+    setSaving(true)
+    try {
+      const file    = await getCroppedImg(src, area)
+      const preview = URL.createObjectURL(file)
+      onConfirm(file, preview)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+      {/* Titre */}
+      <div className="px-5 pt-12 pb-3 flex items-center justify-between">
+        <p className="text-white font-bold text-sm">Recadrer la photo (4:5)</p>
+        <button onClick={onCancel} className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Zone cropper */}
+      <div className="relative flex-1">
+        <Cropper
+          image={src}
+          crop={crop}
+          zoom={zoom}
+          aspect={4 / 5}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={onCropComplete}
+        />
+      </div>
+
+      {/* Contrôles */}
+      <div className="px-5 pb-10 pt-4 bg-black space-y-4">
+        <div className="flex items-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-4 h-4 flex-shrink-0 opacity-60">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+          </svg>
+          <input
+            type="range" min={1} max={3} step={0.01}
+            value={zoom}
+            onChange={e => setZoom(Number(e.target.value))}
+            className="flex-1 accent-orange-500"
+          />
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-5 h-5 flex-shrink-0 opacity-60">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+          </svg>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            className="flex-1 h-12 rounded-2xl font-semibold text-sm text-white border border-white/20 transition active:scale-[0.97]"
+          >
+            Annuler
+          </button>
+          <button
+            onClick={handleConfirm}
+            disabled={saving}
+            className="flex-1 h-12 rounded-2xl font-bold text-white transition active:scale-[0.97] disabled:opacity-60"
+            style={{ backgroundColor: '#E8622A' }}
+          >
+            {saving ? 'Recadrage…' : 'Valider le recadrage'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Formulaire ─────────────────────────────────────────────────────────────
 
 const DEFAULT_FORM = {
@@ -72,7 +188,7 @@ function EventFormModal({
 }) {
   const isEdit = !!event
 
-  const [form,         setForm]         = useState(() =>
+  const [form, setForm] = useState(() =>
     event ? {
       title:       event.title,
       date:        toDateInput(event.starts_at),
@@ -86,16 +202,17 @@ function EventFormModal({
     } : { ...DEFAULT_FORM }
   )
 
-  // Photo
-  const [coverFile,    setCoverFile]    = useState<File | null>(null)
-  const [coverPreview, setCoverPreview] = useState<string | null>(event?.cover_url ?? null)
+  // Photo + crop
+  const [coverPreview,  setCoverPreview]  = useState<string | null>(event?.cover_url ?? null)
+  const [croppedFile,   setCroppedFile]   = useState<File | null>(null)
+  const [coverRemoved,  setCoverRemoved]  = useState(false)
+  const [cropSrc,       setCropSrc]       = useState<string | null>(null)
   const coverRef = useRef<HTMLInputElement>(null)
 
   // Vidéo
-  const [videoFile,    setVideoFile]    = useState<File | null>(null)
-  const [videoName,    setVideoName]    = useState<string | null>(
-    event?.video_url ? event.video_url.split('/').pop() ?? null : null
-  )
+  const [videoPreview,  setVideoPreview]  = useState<string | null>(event?.video_url ?? null)
+  const [videoFile,     setVideoFile]     = useState<File | null>(null)
+  const [videoRemoved,  setVideoRemoved]  = useState(false)
   const videoRef = useRef<HTMLInputElement>(null)
 
   // Sondage
@@ -103,35 +220,47 @@ function EventFormModal({
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions,  setPollOptions]  = useState(['', ''])
 
-  const [saving,       setSaving]       = useState(false)
-  const [error,        setError]        = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState<string | null>(null)
 
   function set(name: string, value: string) {
     setForm(p => ({ ...p, [name]: value }))
   }
 
-  // Photo
+  // ── Photo ──────────────────────────────────────────────────────────────
+
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    setCoverFile(file)
-    const reader = new FileReader()
-    reader.onload = ev => setCoverPreview(ev.target?.result as string)
-    reader.onerror = () => setCoverPreview(null) // HEIC may not preview — that's OK
-    reader.readAsDataURL(file)
+    const objectUrl = URL.createObjectURL(file)
+    setCropSrc(objectUrl)   // ouvre le cropper
+    e.target.value = ''     // reset input
+  }
+
+  function handleCropConfirm(file: File, preview: string) {
+    setCroppedFile(file)
+    setCoverPreview(preview)
+    setCoverRemoved(false)
+    setCropSrc(null)
+  }
+
+  function removeCover() {
+    setCoverPreview(null)
+    setCroppedFile(null)
+    setCoverRemoved(true)
   }
 
   async function uploadCover(file: File): Promise<string | null> {
-    const ext  = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const path = `covers/${Date.now()}.${ext}`
+    const path = `covers/${Date.now()}.jpg`
     const { data, error: upErr } = await supabase.storage
       .from('events')
-      .upload(path, file, { upsert: true })
+      .upload(path, file, { upsert: true, contentType: 'image/jpeg' })
     if (upErr || !data) { console.warn('Cover upload:', upErr?.message); return null }
     return supabase.storage.from('events').getPublicUrl(data.path).data.publicUrl
   }
 
-  // Vidéo
+  // ── Vidéo ──────────────────────────────────────────────────────────────
+
   function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
@@ -141,7 +270,15 @@ function EventFormModal({
       return
     }
     setVideoFile(file)
-    setVideoName(file.name)
+    setVideoPreview(URL.createObjectURL(file))
+    setVideoRemoved(false)
+    e.target.value = ''
+  }
+
+  function removeVideo() {
+    setVideoPreview(null)
+    setVideoFile(null)
+    setVideoRemoved(true)
   }
 
   async function uploadVideo(file: File): Promise<string | null> {
@@ -154,7 +291,8 @@ function EventFormModal({
     return supabase.storage.from('events-videos').getPublicUrl(data.path).data.publicUrl
   }
 
-  // Sondage options
+  // ── Sondage ────────────────────────────────────────────────────────────
+
   function setPollOption(i: number, val: string) {
     setPollOptions(opts => opts.map((o, idx) => idx === i ? val : o))
   }
@@ -166,6 +304,8 @@ function EventFormModal({
     setPollOptions(o => o.filter((_, idx) => idx !== i))
   }
 
+  // ── Submit ─────────────────────────────────────────────────────────────
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.date || !form.time) {
@@ -174,25 +314,30 @@ function EventFormModal({
     }
     if (pollEnabled) {
       if (!pollQuestion.trim()) { setError('La question du sondage est obligatoire.'); return }
-      const validOpts = pollOptions.filter(o => o.trim())
-      if (validOpts.length < 2) { setError('Le sondage nécessite au moins 2 options.'); return }
+      if (pollOptions.filter(o => o.trim()).length < 2) { setError('Le sondage nécessite au moins 2 options.'); return }
     }
 
     setSaving(true)
     setError(null)
 
-    // Upload photo
-    let coverUrl = event?.cover_url ?? null
-    if (coverFile) {
-      const uploaded = await uploadCover(coverFile)
-      if (uploaded) coverUrl = uploaded
+    // Cover
+    let coverUrl: string | null
+    if (coverRemoved) {
+      coverUrl = null
+    } else if (croppedFile) {
+      coverUrl = await uploadCover(croppedFile) ?? event?.cover_url ?? null
+    } else {
+      coverUrl = event?.cover_url ?? null
     }
 
-    // Upload vidéo
-    let videoUrl = event?.video_url ?? null
-    if (videoFile) {
-      const uploaded = await uploadVideo(videoFile)
-      if (uploaded) videoUrl = uploaded
+    // Vidéo
+    let videoUrl: string | null
+    if (videoRemoved) {
+      videoUrl = null
+    } else if (videoFile) {
+      videoUrl = await uploadVideo(videoFile) ?? event?.video_url ?? null
+    } else {
+      videoUrl = event?.video_url ?? null
     }
 
     const payload = {
@@ -218,7 +363,6 @@ function EventFormModal({
         .single()
       if (e || !newEvent) { setError(e?.message ?? 'Erreur création'); setSaving(false); return }
 
-      // Sondage
       if (pollEnabled) {
         const validOpts = pollOptions.filter(o => o.trim())
         await supabase.from('sondages').insert({
@@ -237,9 +381,16 @@ function EventFormModal({
   const lbl = 'block text-xs font-semibold text-gray-500 mb-1.5'
   const inp = 'w-full h-11 px-3 rounded-xl border border-gray-200 text-sm outline-none focus:border-[#E8622A] transition bg-white'
 
+  const hasCover = !!coverPreview
+  const hasVideo = !!videoPreview
+  const hasBoth  = hasCover && hasVideo
+
   return (
     <>
+      {/* Overlay */}
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
+
+      {/* Modal */}
       <div className="fixed inset-x-0 bottom-0 z-50 bg-white rounded-t-3xl shadow-2xl max-h-[94vh] overflow-y-auto lg:inset-auto lg:top-1/2 lg:left-1/2 lg:-translate-x-1/2 lg:-translate-y-1/2 lg:w-full lg:max-w-lg lg:rounded-2xl">
         <div className="flex justify-center pt-3 pb-1 lg:hidden">
           <div className="w-10 h-1 rounded-full bg-gray-200" />
@@ -310,7 +461,8 @@ function EventFormModal({
           {/* Tarif */}
           <div>
             <label className={lbl}>Tarif (€)</label>
-            <input type="number" min="0" step="0.01" value={form.price_cents} onChange={e => set('price_cents', e.target.value)}
+            <input type="number" min="0" step="0.01" value={form.price_cents}
+              onChange={e => set('price_cents', e.target.value)}
               placeholder="0 = gratuit" className={inp} style={{ color: '#1D3550' }} />
           </div>
 
@@ -323,45 +475,142 @@ function EventFormModal({
               style={{ color: '#1D3550' }} />
           </div>
 
-          {/* Photo de couverture */}
+          {/* ── Médias ── */}
           <div>
-            <label className={lbl}>Photo de couverture</label>
-            {coverPreview && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverPreview} alt="Aperçu" className="w-full h-40 object-cover rounded-xl mb-2"
-                onError={() => setCoverPreview(null)} />
-            )}
-            <button type="button" onClick={() => coverRef.current?.click()}
-              className="w-full h-11 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-400 flex items-center justify-center gap-2 transition hover:border-[#E8622A] hover:text-[#E8622A]">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-              </svg>
-              {coverFile ? coverFile.name : coverPreview ? 'Changer la photo' : 'Choisir une photo'}
-            </button>
-            <input ref={coverRef} type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleCoverChange} />
-          </div>
+            <label className={lbl}>Médias</label>
 
-          {/* Vidéo */}
-          <div>
-            <label className={lbl}>Vidéo (optionnel — max 50 Mo)</label>
-            <button type="button" onClick={() => videoRef.current?.click()}
-              className="w-full h-11 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-400 flex items-center justify-center gap-2 transition hover:border-[#E8622A] hover:text-[#E8622A]">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-              {videoName ? videoName : 'Choisir une vidéo'}
-            </button>
-            {videoName && (
-              <p className="text-xs text-gray-400 mt-1 truncate">{videoName}</p>
+            {/* Previews côte à côte (ou seule) */}
+            {(hasCover || hasVideo) && (
+              <div className={`mb-3 ${hasBoth ? 'grid grid-cols-2 gap-2' : ''}`}>
+
+                {/* Photo */}
+                {hasCover && (
+                  <div className="relative rounded-2xl overflow-hidden bg-gray-100" style={{ aspectRatio: '4/5' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={coverPreview!} alt="Photo" className="absolute inset-0 w-full h-full object-cover"
+                      onError={() => setCoverPreview(null)} />
+                    {/* Badge type */}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/50 text-[10px] font-bold text-white">
+                      📷 Photo 4:5
+                    </div>
+                    {/* Bouton X */}
+                    <button
+                      type="button"
+                      onClick={removeCover}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center shadow-lg transition active:scale-90"
+                      style={{ backgroundColor: '#DC2626' }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    {/* Bouton Changer */}
+                    <button
+                      type="button"
+                      onClick={() => coverRef.current?.click()}
+                      className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full text-[10px] font-bold text-white bg-black/50 transition active:scale-95"
+                    >
+                      Changer
+                    </button>
+                  </div>
+                )}
+
+                {/* Vidéo */}
+                {hasVideo && (
+                  <div className="relative rounded-2xl overflow-hidden bg-black" style={{ aspectRatio: '4/5' }}>
+                    <video
+                      src={videoPreview!}
+                      className="absolute inset-0 w-full h-full object-cover"
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                    {/* Icône ▶ */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-6 h-6 ml-0.5">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
+                    </div>
+                    {/* Badge */}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/50 text-[10px] font-bold text-white">
+                      🎬 Vidéo
+                    </div>
+                    {/* Bouton X */}
+                    <button
+                      type="button"
+                      onClick={removeVideo}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center shadow-lg transition active:scale-90"
+                      style={{ backgroundColor: '#DC2626' }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-3.5 h-3.5">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                    {/* Bouton Changer */}
+                    <button
+                      type="button"
+                      onClick={() => videoRef.current?.click()}
+                      className="absolute bottom-2 right-2 px-2.5 py-1 rounded-full text-[10px] font-bold text-white bg-black/50 transition active:scale-95"
+                    >
+                      Changer
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
-            <input ref={videoRef} type="file" accept="video/mp4,video/quicktime,video/webm,.mov"
-              className="hidden" onChange={handleVideoChange} />
+
+            {/* Boutons d'ajout */}
+            <div className={`grid gap-2 ${!hasCover && !hasVideo ? 'grid-cols-2' : hasCover && !hasVideo ? 'grid-cols-1' : !hasCover && hasVideo ? 'grid-cols-1' : 'hidden'}`}>
+              {!hasCover && (
+                <button
+                  type="button"
+                  onClick={() => coverRef.current?.click()}
+                  className="h-20 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1.5 transition hover:border-[#E8622A] hover:bg-orange-50 active:scale-[0.97]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-gray-400">Ajouter une photo</span>
+                  <span className="text-[10px] text-gray-300">Format 4:5 recommandé</span>
+                </button>
+              )}
+              {!hasVideo && (
+                <button
+                  type="button"
+                  onClick={() => videoRef.current?.click()}
+                  className="h-20 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center gap-1.5 transition hover:border-[#E8622A] hover:bg-orange-50 active:scale-[0.97]"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth={1.8} className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                  <span className="text-xs font-semibold text-gray-400">Ajouter une vidéo</span>
+                  <span className="text-[10px] text-gray-300">MP4, MOV, WebM — max 50 Mo</span>
+                </button>
+              )}
+            </div>
+
+            {/* Inputs cachés */}
+            <input
+              ref={coverRef}
+              type="file"
+              accept="image/*,.heic,.heif"
+              className="hidden"
+              onChange={handleCoverChange}
+            />
+            <input
+              ref={videoRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,.mov"
+              className="hidden"
+              onChange={handleVideoChange}
+            />
           </div>
 
           {/* Sondage */}
           {!isEdit && (
             <div className="rounded-2xl border border-gray-100 overflow-hidden">
-              {/* Toggle */}
               <button
                 type="button"
                 onClick={() => setPollEnabled(p => !p)}
@@ -394,7 +643,6 @@ function EventFormModal({
                       style={{ color: '#1D3550' }}
                     />
                   </div>
-
                   <div>
                     <label className={lbl}>Options</label>
                     <div className="space-y-2">
@@ -423,7 +671,6 @@ function EventFormModal({
                         </div>
                       ))}
                     </div>
-
                     {pollOptions.length < 6 && (
                       <button
                         type="button"
@@ -443,18 +690,30 @@ function EventFormModal({
             </div>
           )}
 
-          <button type="submit" disabled={saving}
+          <button
+            type="submit"
+            disabled={saving}
             className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
-            style={{ backgroundColor: '#E8622A' }}>
+            style={{ backgroundColor: '#E8622A' }}
+          >
             {saving ? 'Enregistrement…' : isEdit ? 'Enregistrer les modifications' : 'Créer l\'événement'}
           </button>
         </form>
       </div>
+
+      {/* Crop modal — par-dessus tout */}
+      {cropSrc && (
+        <CropModal
+          src={cropSrc}
+          onConfirm={handleCropConfirm}
+          onCancel={() => setCropSrc(null)}
+        />
+      )}
     </>
   )
 }
 
-// ── Confirmation suppression ────────────────────────────────────────────────
+// ── Confirmation suppression ───────────────────────────────────────────────
 
 function DeleteConfirm({
   event,
@@ -530,15 +789,8 @@ export default function EvenementsPage() {
     return true
   })
 
-  function openCreate() {
-    setFormEvent(null)
-    setModalOpen(true)
-  }
-
-  function openEdit(ev: Event) {
-    setFormEvent(ev)
-    setModalOpen(true)
-  }
+  function openCreate() { setFormEvent(null); setModalOpen(true) }
+  function openEdit(ev: Event) { setFormEvent(ev); setModalOpen(true) }
 
   const FILTERS: { key: Filter; label: string }[] = [
     { key: 'all',      label: 'Tous' },
@@ -567,8 +819,6 @@ export default function EvenementsPage() {
             Créer
           </button>
         </div>
-
-        {/* Filtres */}
         <div className="flex gap-2 mt-4">
           {FILTERS.map(f => (
             <button
@@ -608,20 +858,29 @@ export default function EvenementsPage() {
                 style={{ opacity: isPast ? 0.7 : 1 }}
               >
                 <div className="flex">
-                  {/* Cover ou couleur */}
+                  {/* Vignette cover */}
                   <div
-                    className="w-20 flex-shrink-0 flex items-center justify-center"
+                    className="w-20 flex-shrink-0 flex items-center justify-center relative"
                     style={{
                       background: ev.cover_url
                         ? undefined
                         : `linear-gradient(160deg, ${type.color} 0%, ${type.color}cc 100%)`,
+                      minHeight: '6rem',
                     }}
                   >
                     {ev.cover_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={ev.cover_url} alt={ev.title} className="w-full h-full object-cover" style={{ minHeight: '6rem' }} />
+                      <img src={ev.cover_url} alt={ev.title} className="w-full h-full object-cover absolute inset-0" />
                     ) : (
                       <span className="text-2xl">📅</span>
+                    )}
+                    {/* Badge vidéo */}
+                    {ev.video_url && (
+                      <div className="absolute bottom-1 left-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-3 h-3 ml-0.5">
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </div>
                     )}
                   </div>
 
@@ -637,16 +896,13 @@ export default function EvenementsPage() {
                         </span>
                         <p className="text-sm font-bold truncate" style={{ color: '#1D3550' }}>{ev.title}</p>
                         <p className="text-xs text-gray-400 mt-0.5 truncate">{formatDate(ev.starts_at)}</p>
-                        {ev.location && (
-                          <p className="text-xs text-gray-400 truncate">{ev.location}</p>
-                        )}
+                        {ev.location && <p className="text-xs text-gray-400 truncate">{ev.location}</p>}
                         {ev.price_cents > 0 && (
                           <p className="text-xs font-semibold mt-0.5" style={{ color: '#E8622A' }}>
                             {(ev.price_cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                           </p>
                         )}
                       </div>
-
                       {/* Actions */}
                       <div className="flex flex-col gap-1.5 flex-shrink-0">
                         <button
@@ -677,7 +933,6 @@ export default function EvenementsPage() {
         )}
       </div>
 
-      {/* Modal formulaire */}
       {modalOpen && (
         <EventFormModal
           event={formEvent}
@@ -686,7 +941,6 @@ export default function EvenementsPage() {
         />
       )}
 
-      {/* Confirmation suppression */}
       {deleteTarget && (
         <DeleteConfirm
           event={deleteTarget}
