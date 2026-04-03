@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
+import OneSignal from 'react-onesignal'
 import { supabase } from '@/lib/supabase'
 import { FORMATIONS_ECM } from '@/lib/formations'
 import CouponFlow, { type CouponAssignment } from '@/components/CouponFlow'
@@ -241,6 +242,7 @@ export default function ProfilPage() {
   const [qrOpen,        setQrOpen]        = useState(false)
   const [coupons,       setCoupons]       = useState<CouponRow[]>([])
   const [activeCoupon,  setActiveCoupon]  = useState<CouponRow | null>(null)
+  const [notifGranted,  setNotifGranted]  = useState<boolean | null>(null)
 
   useEffect(() => {
     async function fetchProfile() {
@@ -377,6 +379,24 @@ export default function ProfilPage() {
     }
     fetchProfile()
   }, [])
+
+  // Vérifie la permission OneSignal au montage (getter synchrone)
+  useEffect(() => {
+    try {
+      setNotifGranted(OneSignal.Notifications.permission)
+    } catch {
+      setNotifGranted(false)
+    }
+  }, [])
+
+  async function handleNotifRequest() {
+    await OneSignal.Slidedown.promptPush()
+    try {
+      setNotifGranted(OneSignal.Notifications.permission)
+    } catch {
+      setNotifGranted(false)
+    }
+  }
 
   async function handleSignOut() {
     setLoggingOut(true)
@@ -685,6 +705,25 @@ export default function ProfilPage() {
             </div>
           )}
         </div>
+
+        {/* Notifications */}
+        {notifGranted === false && (
+          <button
+            onClick={handleNotifRequest}
+            className="w-full rounded-2xl font-bold text-sm transition active:scale-[0.98] flex items-center justify-center gap-2 border-2"
+            style={{ height: '52px', borderColor: '#E8622A', color: '#E8622A', backgroundColor: '#FFF4EE' }}
+          >
+            🔔 Activer les notifications
+          </button>
+        )}
+        {notifGranted === true && (
+          <div
+            className="w-full rounded-2xl font-semibold text-sm flex items-center justify-center gap-2"
+            style={{ height: '52px', backgroundColor: '#F0FDF4', color: '#16A34A' }}
+          >
+            ✅ Notifications activées
+          </div>
+        )}
 
         {/* Déconnexion */}
         <button

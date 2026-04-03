@@ -11,11 +11,29 @@ export default function OneSignalProvider() {
     async function init() {
       await OneSignal.init({
         appId:                       process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID!,
-        allowLocalhostAsSecureOrigin: true,   // dev local
-      })
+        allowLocalhostAsSecureOrigin: true,
+        serviceWorkerPath:           '/OneSignalSDKWorker.js',
+        promptOptions: {
+          slidedown: {
+            prompts: [{
+              type:       'push',
+              autoPrompt: true,
+              text: {
+                actionMessage: 'Recevoir les notifications du BDE ECM Dijon ?',
+                acceptButton:  'Autoriser',
+                cancelButton:  'Plus tard',
+              },
+            }],
+          },
+        },
+      } as unknown as Parameters<typeof OneSignal.init>[0])
+
       initialized = true
 
-      // Demande la permission push (slide-down natif OneSignal)
+      // Debug permission (getter synchrone)
+      console.log('OneSignal permission:', OneSignal.Notifications.permission)
+
+      // Demande la permission push
       OneSignal.Slidedown.promptPush()
 
       // Associe l'External User ID au user Supabase si déjà connecté
@@ -25,7 +43,7 @@ export default function OneSignalProvider() {
 
     init().catch(console.error)
 
-    // Écoute les changements de session pour login/logout en temps réel
+    // Synchronise login/logout avec la session Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!initialized) return
