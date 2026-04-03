@@ -30,11 +30,10 @@ export default function OneSignalProvider() {
 
       initialized = true
 
-      // Debug permission (getter synchrone)
-      console.log('OneSignal permission:', OneSignal.Notifications.permission)
-
-      // Demande la permission push
-      OneSignal.Slidedown.promptPush()
+      // Debug permission (API native, fonctionne iOS PWA)
+      if ('Notification' in window) {
+        console.log('OneSignal permission:', Notification.permission)
+      }
 
       // Associe l'External User ID au user Supabase si déjà connecté
       const { data: { user } } = await supabase.auth.getUser()

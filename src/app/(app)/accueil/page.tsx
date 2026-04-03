@@ -211,13 +211,14 @@ function RewardsSheet({
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AccueilPage() {
-  const [profile,    setProfile]    = useState<Profile | null>(null)
-  const [events,     setEvents]     = useState<Event[]>([])
-  const [rewards,    setRewards]    = useState<Reward[]>([])
-  const [loading,    setLoading]    = useState(true)
-  const [error,      setError]      = useState<string | null>(null)
-  const [sheetOpen,  setSheetOpen]  = useState(false)
-  const [tierUpName, setTierUpName] = useState<string | null>(null)
+  const [profile,              setProfile]              = useState<Profile | null>(null)
+  const [events,               setEvents]               = useState<Event[]>([])
+  const [rewards,              setRewards]              = useState<Reward[]>([])
+  const [loading,              setLoading]              = useState(true)
+  const [error,                setError]                = useState<string | null>(null)
+  const [sheetOpen,            setSheetOpen]            = useState(false)
+  const [tierUpName,           setTierUpName]           = useState<string | null>(null)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true) // true par défaut pour éviter le flash
 
   // Ref pour détecter le changement de palier sans déclencher au premier chargement
   const prevTierRef   = useRef<number | null>(null)
@@ -278,6 +279,27 @@ export default function AccueilPage() {
     document.addEventListener('visibilitychange', handleVisible)
     return () => document.removeEventListener('visibilitychange', handleVisible)
   }, [fetchData])
+
+  // ── Notifications ──────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if ('Notification' in window) {
+      setNotificationsEnabled(Notification.permission === 'granted')
+    }
+  }, [])
+
+  async function handleEnableNotifications() {
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        const OneSignal = (await import('react-onesignal')).default
+        await OneSignal.User.PushSubscription.optIn()
+        setNotificationsEnabled(true)
+      }
+    } catch (err) {
+      console.error('Erreur notifications:', err)
+    }
+  }
 
   // ── Détection changement de palier ──────────────────────────────────────
 
@@ -352,6 +374,24 @@ export default function AccueilPage() {
       )}
 
       <div className="px-5 space-y-5 pb-6">
+
+        {/* ── Bannière notifications ── */}
+        {!notificationsEnabled && (
+          <div className="rounded-2xl p-4 flex items-center justify-between gap-3"
+            style={{ backgroundColor: '#FFF7ED', border: '1px solid #FED7AA' }}>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm" style={{ color: '#92400E' }}>🔔 Active les notifications</p>
+              <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>Ne rate aucun événement du BDE !</p>
+            </div>
+            <button
+              onClick={handleEnableNotifications}
+              className="flex-shrink-0 px-4 py-2 rounded-xl font-bold text-sm text-white transition active:scale-[0.96]"
+              style={{ backgroundColor: '#E8622A' }}
+            >
+              Activer
+            </button>
+          </div>
+        )}
 
         {/* ── Carte points ── */}
         <div

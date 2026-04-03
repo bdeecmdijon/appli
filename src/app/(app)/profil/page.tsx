@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
-import OneSignal from 'react-onesignal'
 import { supabase } from '@/lib/supabase'
 import { FORMATIONS_ECM } from '@/lib/formations'
 import CouponFlow, { type CouponAssignment } from '@/components/CouponFlow'
@@ -380,21 +379,23 @@ export default function ProfilPage() {
     fetchProfile()
   }, [])
 
-  // Vérifie la permission OneSignal au montage (getter synchrone)
+  // Vérifie la permission via l'API native (fonctionne iOS PWA)
   useEffect(() => {
-    try {
-      setNotifGranted(OneSignal.Notifications.permission)
-    } catch {
-      setNotifGranted(false)
+    if ('Notification' in window) {
+      setNotifGranted(Notification.permission === 'granted')
     }
   }, [])
 
   async function handleNotifRequest() {
-    await OneSignal.Slidedown.promptPush()
     try {
-      setNotifGranted(OneSignal.Notifications.permission)
-    } catch {
-      setNotifGranted(false)
+      const permission = await Notification.requestPermission()
+      if (permission === 'granted') {
+        const OneSignal = (await import('react-onesignal')).default
+        await OneSignal.User.PushSubscription.optIn()
+        setNotifGranted(true)
+      }
+    } catch (err) {
+      console.error('Erreur notifications:', err)
     }
   }
 
