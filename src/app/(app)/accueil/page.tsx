@@ -508,90 +508,74 @@ export default function AccueilPage() {
           </div>
         </div>
 
-        {/* ── Programme fidélité ── */}
+        {/* ── Prochain palier ── */}
         {rewards.length > 0 && (() => {
-          const next      = rewards.find(r => r.points_required > points)
-          const prevPts   = [...rewards].filter(r => r.points_required <= points).pop()?.points_required ?? 0
-          const pct       = next
+          const next     = rewards.find(r => r.points_required > points)
+          const prevPts  = [...rewards].filter(r => r.points_required <= points).pop()?.points_required ?? 0
+          const pct      = next
             ? Math.min(100, ((points - prevPts) / (next.points_required - prevPts)) * 100)
             : 100
-          return (
-            <div>
-              <h2 className="text-lg font-bold mb-3" style={{ color: '#1D3550' }}>🏆 Programme fidélité</h2>
+          const unlocked = rewards.filter(r => r.points_required <= points)
 
-              {/* Barre de progression */}
-              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3">
-                {next ? (
-                  <>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs font-semibold text-gray-500">Prochain palier</p>
-                      <p className="text-xs font-bold" style={{ color: '#E8622A' }}>
-                        {next.points_required - points} pts manquants
-                      </p>
+          return (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+              <p className="text-sm font-bold" style={{ color: '#1D3550' }}>🎯 Prochain palier</p>
+
+              {next ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{next.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold" style={{ color: '#1D3550' }}>{next.name}</p>
+                      {next.description && (
+                        <p className="text-xs text-gray-400 truncate">{next.description}</p>
+                      )}
                     </div>
-                    <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#F3F4F6' }}>
+                  </div>
+                  <div>
+                    <div className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F3F4F6' }}>
                       <div
                         className="h-full rounded-full transition-all duration-700"
                         style={{ width: `${pct}%`, backgroundColor: '#E8622A' }}
                       />
                     </div>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <p className="text-xs text-gray-400">{points} pts</p>
-                      <p className="text-xs text-gray-400 truncate ml-2">
-                        {next.emoji} {next.name} — {next.points_required} pts
+                    <div className="flex justify-between mt-1.5">
+                      <p className="text-xs text-gray-400">{points} / {next.points_required} pts</p>
+                      <p className="text-xs font-semibold" style={{ color: '#E8622A' }}>
+                        {next.points_required - points} pts manquants
                       </p>
                     </div>
-                  </>
-                ) : (
-                  <p className="text-sm font-bold text-center py-1" style={{ color: '#E8622A' }}>
-                    🎉 Tous les paliers débloqués !
-                  </p>
-                )}
-              </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm font-bold text-center py-1" style={{ color: '#E8622A' }}>
+                  🎉 Tous les paliers atteints !
+                </p>
+              )}
 
-              {/* Liste des récompenses */}
-              <div className="space-y-2">
-                {rewards.map(reward => {
-                  const canAfford  = points >= reward.points_required
-                  const ptsMissing = reward.points_required - points
-                  return (
-                    <div
-                      key={reward.id}
-                      className="bg-white rounded-2xl shadow-sm border p-4 flex items-center gap-3"
-                      style={{ borderColor: canAfford ? '#E8622A30' : '#E5E7EB' }}
-                    >
-                      <div
-                        className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-xl"
-                        style={{ backgroundColor: canAfford ? '#FFF4EE' : '#F9FAFB' }}
-                      >
-                        {reward.emoji}
-                      </div>
+              {/* Paliers débloqués disponibles à échanger */}
+              {unlocked.length > 0 && (
+                <div className="border-t border-gray-100 pt-3 space-y-2">
+                  <p className="text-xs font-semibold text-gray-500">Disponibles à échanger</p>
+                  {unlocked.map(r => (
+                    <div key={r.id} className="flex items-center gap-3 rounded-xl p-3"
+                      style={{ backgroundColor: '#FFF4EE' }}>
+                      <span className="text-xl flex-shrink-0">{r.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-bold leading-tight" style={{ color: '#1D3550' }}>
-                          {reward.name}
-                        </p>
-                        {reward.description && (
-                          <p className="text-xs text-gray-400 mt-0.5 truncate">{reward.description}</p>
-                        )}
-                        <p className="text-xs font-extrabold mt-1" style={{ color: canAfford ? '#E8622A' : '#9CA3AF' }}>
-                          {reward.points_required} pts
-                        </p>
+                        <p className="text-xs font-bold truncate" style={{ color: '#1D3550' }}>{r.name}</p>
+                        <p className="text-xs font-bold" style={{ color: '#E8622A' }}>{r.points_required} pts</p>
                       </div>
                       <button
-                        onClick={() => { if (canAfford) setActiveReward(reward) }}
-                        disabled={!canAfford}
-                        className="flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition active:scale-[0.96] disabled:cursor-not-allowed whitespace-nowrap"
-                        style={{
-                          backgroundColor: canAfford ? '#E8622A' : '#F3F4F6',
-                          color:           canAfford ? '#FFFFFF'  : '#9CA3AF',
-                        }}
+                        onClick={() => setActiveReward(r)}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition active:scale-[0.96]"
+                        style={{ backgroundColor: '#E8622A' }}
                       >
-                        {canAfford ? 'Échanger' : `−${ptsMissing} pts`}
+                        Échanger
                       </button>
                     </div>
-                  )
-                })}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         })()}
