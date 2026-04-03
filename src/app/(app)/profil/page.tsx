@@ -60,9 +60,9 @@ function getInitials(name: string | null) {
 }
 
 function displayFormation(profile: Profile | null) {
-  if (!profile) return '—'
-  if (profile.ecole === 'ECM') return profile.formation ?? '—'
-  return profile.autre_ecole ?? profile.ecole ?? profile.formation ?? '—'
+  if (!profile) return 'Non renseigné'
+  if (profile.ecole === 'ECM') return profile.formation ?? 'Non renseigné'
+  return profile.autre_ecole ?? profile.ecole ?? profile.formation ?? 'Non renseigné'
 }
 
 // ── Composant édition profil ───────────────────────────────────────────────

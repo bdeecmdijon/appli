@@ -128,32 +128,51 @@ export default function RegisterPage() {
       })
     }
 
-    // 3. Upsert du profil complet
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert(
-        {
-          id:            userId,
-          email:         form.email,
-          full_name:     fullName,
-          phone:         phoneClean             || null,
-          ecole:         form.ecole           || null,
-          formation:     form.formation       || null,
-          autre_ecole:   form.autre_ecole     || null,
-          points_balance: 0,
-          total_points:   0,
-        },
-        { onConflict: 'id' }
-      )
+    // 3. Sauvegarder le profil complet (sans total_points géré côté DB)
+    const profilePayload = {
+      id:          userId,
+      email:       form.email,
+      full_name:   fullName,
+      phone:       phoneClean       || null,
+      ecole:       form.ecole       || null,
+      formation:   form.formation   || null,
+      autre_ecole: form.autre_ecole || null,
+    }
 
-    if (profileError) {
-      console.error('[Register] profileError →', {
-        message: profileError.message,
-        code:    profileError.code,
-        details: profileError.details,
-        hint:    profileError.hint,
+    console.log('[Register] saving profile →', profilePayload)
+
+    // Tentative 1 : upsert (INSERT or UPDATE selon si le trigger a déjà créé la ligne)
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert(profilePayload, { onConflict: 'id' })
+
+    if (upsertError) {
+      console.warn('[Register] upsert failed, trying UPDATE →', {
+        message: upsertError.message, code: upsertError.code,
       })
-      // On continue : le trigger handle_new_user a créé le profil de base avec full_name
+      // Tentative 2 : update direct (le trigger handle_new_user a déjà créé la ligne)
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          full_name:   fullName,
+          phone:       phoneClean       || null,
+          ecole:       form.ecole       || null,
+          formation:   form.formation   || null,
+          autre_ecole: form.autre_ecole || null,
+        })
+        .eq('id', userId)
+
+      if (updateError) {
+        console.error('[Register] UPDATE also failed →', {
+          message: updateError.message, code: updateError.code,
+          details: updateError.details, hint: updateError.hint,
+        })
+        // On continue quand même — le compte est créé, le profil peut être complété plus tard
+      } else {
+        console.log('[Register] UPDATE succeeded')
+      }
+    } else {
+      console.log('[Register] upsert succeeded')
     }
 
     // TODO: Réactiver la confirmation email avant la mise en production
