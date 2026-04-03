@@ -383,6 +383,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Ferme le drawer quand la route change
   useEffect(() => { setDrawerOpen(false) }, [pathname])
 
+  // La page de login ne doit PAS être protégée par AdminGuard
+  // (early return APRÈS tous les hooks pour respecter les Rules of Hooks)
+  if (pathname === '/admin/login') {
+    return <>{children}</>
+  }
+
   return (
     <AdminGuard>
       <div className="min-h-screen lg:flex" style={{ backgroundColor: '#F3F4F6' }}>
