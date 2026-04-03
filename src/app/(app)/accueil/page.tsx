@@ -219,6 +219,8 @@ export default function AccueilPage() {
   const [sheetOpen,            setSheetOpen]            = useState(false)
   const [tierUpName,           setTierUpName]           = useState<string | null>(null)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true) // true par défaut pour éviter le flash
+  const [iosUnsupported,       setIosUnsupported]       = useState(false)
+  const [debugLogs,            setDebugLogs]            = useState<string[]>([])
 
   // Ref pour détecter le changement de palier sans déclencher au premier chargement
   const prevTierRef   = useRef<number | null>(null)
@@ -282,25 +284,58 @@ export default function AccueilPage() {
 
   // ── Notifications ──────────────────────────────────────────────────────
 
+  function addLog(msg: string) {
+    console.log(msg)
+    setDebugLogs(prev => [`${new Date().toLocaleTimeString()}: ${msg}`, ...prev].slice(0, 20))
+  }
+
+  function getIOSVersion(): number {
+    const match = navigator.userAgent.match(/OS (\d+)_(\d+)/)
+    return match ? parseFloat(`${match[1]}.${match[2]}`) : 0
+  }
+
   useEffect(() => {
-    if ('Notification' in window) {
-      setNotificationsEnabled(Notification.permission === 'granted')
+    if (!('Notification' in window)) return
+
+    const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    const iosVersion   = isIOS ? getIOSVersion() : 99
+
+    addLog(`UA: ${navigator.userAgent.slice(0, 60)}`)
+    addLog(`iOS: ${isIOS} | standalone: ${isStandalone} | version: ${iosVersion}`)
+    addLog(`Notification.permission: ${Notification.permission}`)
+
+    if (isIOS && iosVersion < 16.4) {
+      setIosUnsupported(true)
+      return
     }
+
+    setNotificationsEnabled(Notification.permission === 'granted')
   }, [])
 
   async function handleEnableNotifications() {
     try {
-      console.log('[Notif] Demande permission…')
+      const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+
+      addLog(`Activation — iOS: ${isIOS}, standalone: ${isStandalone}`)
+      addLog('Appel Notification.requestPermission()…')
+
       const permission = await Notification.requestPermission()
-      console.log('[Notif] permission:', permission)
+      addLog(`permission reçue: ${permission}`)
+
       if (permission === 'granted') {
+        addLog('Import OneSignal…')
         const OneSignal = (await import('react-onesignal')).default
-        console.log('[Notif] optIn OneSignal…')
+        addLog('OneSignal.User.PushSubscription.optIn()…')
         await OneSignal.User.PushSubscription.optIn()
-        console.log('[Notif] optIn done — optedIn:', OneSignal.User.PushSubscription.optedIn)
+        const optedIn = OneSignal.User.PushSubscription.optedIn
+        addLog(`optIn terminé — optedIn: ${optedIn}`)
         setNotificationsEnabled(true)
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      addLog(`ERREUR: ${msg}`)
       console.error('[Notif] Erreur:', err)
     }
   }
@@ -380,7 +415,15 @@ export default function AccueilPage() {
       <div className="px-5 space-y-5 pb-6">
 
         {/* ── Bannière notifications ── */}
-        {!notificationsEnabled && (
+        {iosUnsupported && (
+          <div className="rounded-2xl p-4" style={{ backgroundColor: '#FFF7ED', border: '1px solid #FED7AA' }}>
+            <p className="font-bold text-sm" style={{ color: '#92400E' }}>📱 iOS 16.4+ requis</p>
+            <p className="text-xs mt-0.5" style={{ color: '#B45309' }}>
+              Les notifications push nécessitent iOS 16.4 ou supérieur et l&apos;app installée sur l&apos;écran d&apos;accueil.
+            </p>
+          </div>
+        )}
+        {!iosUnsupported && !notificationsEnabled && (
           <div className="rounded-2xl p-4 flex items-center justify-between gap-3"
             style={{ backgroundColor: '#FFF7ED', border: '1px solid #FED7AA' }}>
             <div className="flex-1 min-w-0">
@@ -394,6 +437,16 @@ export default function AccueilPage() {
             >
               Activer
             </button>
+          </div>
+        )}
+
+        {/* ── Debug logs (dev uniquement) ── */}
+        {process.env.NODE_ENV === 'development' && debugLogs.length > 0 && (
+          <div className="rounded-xl p-3 space-y-0.5" style={{ backgroundColor: '#0F172A' }}>
+            <p className="text-[10px] font-bold text-white/40 mb-1">DEBUG NOTIFICATIONS</p>
+            {debugLogs.map((log, i) => (
+              <p key={i} className="text-[10px] font-mono text-green-400 leading-tight">{log}</p>
+            ))}
           </div>
         )}
 

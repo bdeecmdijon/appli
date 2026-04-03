@@ -241,7 +241,9 @@ export default function ProfilPage() {
   const [qrOpen,        setQrOpen]        = useState(false)
   const [coupons,       setCoupons]       = useState<CouponRow[]>([])
   const [activeCoupon,  setActiveCoupon]  = useState<CouponRow | null>(null)
-  const [notifGranted,  setNotifGranted]  = useState<boolean | null>(null)
+  const [notifGranted,    setNotifGranted]    = useState<boolean | null>(null)
+  const [iosUnsupported,  setIosUnsupported]  = useState(false)
+  const [debugLogs,       setDebugLogs]       = useState<string[]>([])
 
   useEffect(() => {
     async function fetchProfile() {
@@ -379,26 +381,51 @@ export default function ProfilPage() {
     fetchProfile()
   }, [])
 
+  function addLog(msg: string) {
+    console.log(msg)
+    setDebugLogs(prev => [`${new Date().toLocaleTimeString()}: ${msg}`, ...prev].slice(0, 20))
+  }
+
+  function getIOSVersion(): number {
+    const match = navigator.userAgent.match(/OS (\d+)_(\d+)/)
+    return match ? parseFloat(`${match[1]}.${match[2]}`) : 0
+  }
+
   // Vérifie la permission via l'API native (fonctionne iOS PWA)
   useEffect(() => {
-    if ('Notification' in window) {
-      setNotifGranted(Notification.permission === 'granted')
+    if (!('Notification' in window)) return
+
+    const isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const iosVersion = isIOS ? getIOSVersion() : 99
+
+    addLog(`iOS: ${isIOS} | version: ${iosVersion} | permission: ${Notification.permission}`)
+
+    if (isIOS && iosVersion < 16.4) {
+      setIosUnsupported(true)
+      return
     }
+    setNotifGranted(Notification.permission === 'granted')
   }, [])
 
   async function handleNotifRequest() {
     try {
-      console.log('[Notif] Demande permission…')
+      const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      addLog(`Activation — iOS: ${isIOS}, standalone: ${isStandalone}`)
+
       const permission = await Notification.requestPermission()
-      console.log('[Notif] permission:', permission)
+      addLog(`permission: ${permission}`)
+
       if (permission === 'granted') {
         const OneSignal = (await import('react-onesignal')).default
-        console.log('[Notif] optIn OneSignal…')
         await OneSignal.User.PushSubscription.optIn()
-        console.log('[Notif] optIn done — optedIn:', OneSignal.User.PushSubscription.optedIn)
+        const optedIn = OneSignal.User.PushSubscription.optedIn
+        addLog(`optIn done — optedIn: ${optedIn}`)
         setNotifGranted(true)
       }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      addLog(`ERREUR: ${msg}`)
       console.error('[Notif] Erreur:', err)
     }
   }
@@ -712,7 +739,15 @@ export default function ProfilPage() {
         </div>
 
         {/* Notifications */}
-        {notifGranted === false && (
+        {iosUnsupported && (
+          <div className="rounded-2xl p-4" style={{ backgroundColor: '#FFF7ED', border: '1px solid #FED7AA' }}>
+            <p className="text-sm font-bold" style={{ color: '#92400E' }}>📱 iOS 16.4+ requis</p>
+            <p className="text-xs mt-1" style={{ color: '#B45309' }}>
+              Les notifications nécessitent iOS 16.4+ et l&apos;app installée sur l&apos;écran d&apos;accueil.
+            </p>
+          </div>
+        )}
+        {!iosUnsupported && notifGranted === false && (
           <button
             onClick={handleNotifRequest}
             className="w-full rounded-2xl font-bold text-sm transition active:scale-[0.98] flex items-center justify-center gap-2 border-2"
@@ -721,12 +756,22 @@ export default function ProfilPage() {
             🔔 Activer les notifications
           </button>
         )}
-        {notifGranted === true && (
+        {!iosUnsupported && notifGranted === true && (
           <div
             className="w-full rounded-2xl font-semibold text-sm flex items-center justify-center gap-2"
             style={{ height: '52px', backgroundColor: '#F0FDF4', color: '#16A34A' }}
           >
             ✅ Notifications activées
+          </div>
+        )}
+
+        {/* Debug logs (dev uniquement) */}
+        {process.env.NODE_ENV === 'development' && debugLogs.length > 0 && (
+          <div className="rounded-xl p-3 space-y-0.5" style={{ backgroundColor: '#0F172A' }}>
+            <p className="text-[10px] font-bold text-white/40 mb-1">DEBUG NOTIFICATIONS</p>
+            {debugLogs.map((log, i) => (
+              <p key={i} className="text-[10px] font-mono text-green-400 leading-tight">{log}</p>
+            ))}
           </div>
         )}
 
