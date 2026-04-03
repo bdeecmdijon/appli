@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CalendarSection from '@/components/CalendarSection'
+import RedemptionFlow, { type Reward } from '@/components/RedemptionFlow'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -22,14 +23,6 @@ interface Event {
   cover_url: string | null
 }
 
-interface Reward {
-  id: string
-  emoji: string
-  name: string
-  points_cost: number
-  description: string
-}
-
 // ── Mocks fallback ─────────────────────────────────────────────────────────
 
 const MOCK_PROFILE: Profile = {
@@ -42,12 +35,6 @@ const MOCK_EVENTS: Event[] = [
   { id: '1', title: 'Soirée de rentrée BDE', starts_at: '2026-04-12T21:00:00', location: 'Le Consortium, Dijon', cover_url: null },
   { id: '2', title: 'Tournoi de foot inter-promos', starts_at: '2026-04-18T14:00:00', location: 'Stade Gaston-Gérard, Dijon', cover_url: null },
   { id: '3', title: 'Conférence Entrepreneuriat', starts_at: '2026-04-25T18:30:00', location: 'Amphi A — ECM Dijon', cover_url: null },
-]
-
-const MOCK_REWARDS: Reward[] = [
-  { id: '1', emoji: '🍺', name: 'Boisson offerte', points_cost: 200, description: 'À retirer au bar partenaire' },
-  { id: '2', emoji: '🎁', name: 'Goodies BDE', points_cost: 300, description: 'Sweat ou tote bag ECM' },
-  { id: '3', emoji: '🎟️', name: 'Entrée soirée', points_cost: 500, description: 'Accès soirée thématique BDE' },
 ]
 
 const EVENT_COLORS = ['#E8622A', '#1D3550', '#2E6DA4']
@@ -128,13 +115,30 @@ function TierUpModal({ tierName, color, onClose }: { tierName: string; color: st
 
 // ── Composant Bottom Sheet Récompenses ─────────────────────────────────────
 
-function RewardsSheet({ points, onClose }: { points: number; onClose: () => void }) {
-  const [toast, setToast] = useState(false)
+function RewardsSheet({
+  rewards,
+  points,
+  onClose,
+  onPointsUpdated,
+}: {
+  rewards: Reward[]
+  points: number
+  onClose: () => void
+  onPointsUpdated: (newBalance: number) => void
+}) {
+  const [activeReward, setActiveReward] = useState<Reward | null>(null)
 
-  function handleRedeem(reward: Reward) {
-    if (points < reward.points_cost) return
-    setToast(true)
-    setTimeout(() => setToast(false), 2500)
+  if (activeReward) {
+    return (
+      <RedemptionFlow
+        reward={activeReward}
+        onClose={() => { setActiveReward(null); onClose() }}
+        onSuccess={(newBalance) => {
+          onPointsUpdated(newBalance)
+          setActiveReward(null)
+        }}
+      />
+    )
   }
 
   return (
@@ -154,48 +158,49 @@ function RewardsSheet({ points, onClose }: { points: number; onClose: () => void
             </span>
           </div>
 
-          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
-            {MOCK_REWARDS.map(reward => {
-              const canAfford = points >= reward.points_cost
-              return (
-                <div
-                  key={reward.id}
-                  className="flex-shrink-0 w-44 rounded-2xl border p-4 flex flex-col gap-2"
-                  style={{
-                    borderColor: canAfford ? '#E8622A' + '40' : '#E5E7EB',
-                    backgroundColor: canAfford ? '#E8622A' + '06' : '#F9FAFB',
-                  }}
-                >
-                  <span className="text-3xl">{reward.emoji}</span>
-                  <p className="text-sm font-bold leading-tight" style={{ color: '#1D3550' }}>
-                    {reward.name}
-                  </p>
-                  <p className="text-xs text-gray-400">{reward.description}</p>
-                  <p className="text-sm font-extrabold" style={{ color: canAfford ? '#E8622A' : '#9CA3AF' }}>
-                    {reward.points_cost} pts
-                  </p>
-                  <button
-                    onClick={() => handleRedeem(reward)}
-                    disabled={!canAfford}
-                    className="w-full py-2 rounded-xl text-xs font-bold transition active:scale-[0.96]"
+          {rewards.length === 0 ? (
+            <p className="text-center text-gray-400 text-sm py-6">
+              Aucune récompense disponible pour le moment.
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
+              {rewards.map(reward => {
+                const canAfford = points >= reward.points_cost
+                return (
+                  <div
+                    key={reward.id}
+                    className="rounded-2xl border p-4 flex items-center gap-4"
                     style={{
-                      backgroundColor: canAfford ? '#E8622A' : '#E5E7EB',
-                      color: canAfford ? '#FFFFFF' : '#9CA3AF',
+                      borderColor:     canAfford ? '#E8622A40' : '#E5E7EB',
+                      backgroundColor: canAfford ? '#E8622A06' : '#F9FAFB',
                     }}
                   >
-                    {canAfford ? 'Échanger' : 'Points insuffisants'}
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-
-          {toast && (
-            <div
-              className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold text-center"
-              style={{ backgroundColor: '#1D3550', color: '#fff' }}
-            >
-              🚧 Bientôt disponible
+                    <span className="text-3xl flex-shrink-0">{reward.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold leading-tight" style={{ color: '#1D3550' }}>
+                        {reward.name}
+                      </p>
+                      {reward.description && (
+                        <p className="text-xs text-gray-400 mt-0.5 truncate">{reward.description}</p>
+                      )}
+                      <p className="text-sm font-extrabold mt-1" style={{ color: canAfford ? '#E8622A' : '#9CA3AF' }}>
+                        {reward.points_cost} pts
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setActiveReward(reward)}
+                      disabled={!canAfford}
+                      className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition active:scale-[0.96] disabled:cursor-not-allowed"
+                      style={{
+                        backgroundColor: canAfford ? '#E8622A' : '#E5E7EB',
+                        color:           canAfford ? '#FFFFFF'  : '#9CA3AF',
+                      }}
+                    >
+                      {canAfford ? 'Échanger' : 'Insuffisant'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -207,11 +212,12 @@ function RewardsSheet({ points, onClose }: { points: number; onClose: () => void
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AccueilPage() {
-  const [profile,   setProfile]   = useState<Profile | null>(null)
-  const [events,    setEvents]    = useState<Event[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState<string | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [profile,    setProfile]    = useState<Profile | null>(null)
+  const [events,     setEvents]     = useState<Event[]>([])
+  const [rewards,    setRewards]    = useState<Reward[]>([])
+  const [loading,    setLoading]    = useState(true)
+  const [error,      setError]      = useState<string | null>(null)
+  const [sheetOpen,  setSheetOpen]  = useState(false)
   const [tierUpName, setTierUpName] = useState<string | null>(null)
 
   // Ref pour détecter le changement de palier sans déclencher au premier chargement
@@ -235,14 +241,23 @@ export default function AccueilPage() {
         setProfile(MOCK_PROFILE)
       }
 
-      const { data: eventsData, error: eventsErr } = await supabase
-        .from('events')
-        .select('id, title, starts_at, location, cover_url')
-        .gt('starts_at', new Date().toISOString())
-        .order('starts_at', { ascending: true })
-        .limit(3)
-      if (eventsErr) throw eventsErr
-      setEvents(eventsData && eventsData.length > 0 ? eventsData : MOCK_EVENTS)
+      const [eventsRes, rewardsRes] = await Promise.all([
+        supabase
+          .from('events')
+          .select('id, title, starts_at, location, cover_url')
+          .gt('starts_at', new Date().toISOString())
+          .order('starts_at', { ascending: true })
+          .limit(3),
+        supabase
+          .from('rewards')
+          .select('id, emoji, name, description, points_cost')
+          .eq('is_active', true)
+          .order('points_cost', { ascending: true }),
+      ])
+
+      if (eventsRes.error) throw eventsRes.error
+      setEvents(eventsRes.data && eventsRes.data.length > 0 ? eventsRes.data : MOCK_EVENTS)
+      setRewards(rewardsRes.data ?? [])
     } catch (err) {
       console.error(err)
       setError('Données de démonstration affichées.')
@@ -491,7 +506,12 @@ export default function AccueilPage() {
 
       {/* Bottom Sheet récompenses */}
       {sheetOpen && (
-        <RewardsSheet points={points} onClose={() => setSheetOpen(false)} />
+        <RewardsSheet
+          rewards={rewards}
+          points={points}
+          onClose={() => setSheetOpen(false)}
+          onPointsUpdated={(newBalance) => setProfile(prev => prev ? { ...prev, points_balance: newBalance } : prev)}
+        />
       )}
 
       {/* Modal nouveau palier */}
