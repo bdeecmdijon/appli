@@ -12,13 +12,9 @@ const QrScanner = dynamic(
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface ValidationOk {
-  student_name: string
-  student_code: string
-  reward_name:  string
-  reward_emoji: string
-  points_spent: number
-}
+type ValidationOk =
+  | { kind: 'reward'; student_name: string; student_code: string; reward_name: string; reward_emoji: string; points_spent: number }
+  | { kind: 'coupon'; student_name: string; student_code: string; coupon_title: string; coupon_emoji: string; coupon_description: string | null }
 
 type Stage = 'scanning' | 'loading' | 'success' | 'error'
 
@@ -39,8 +35,14 @@ export default function ScannerPage() {
     processingRef.current = true
     setStage('loading')
 
+    // Auto-détection : tokens coupon commencent par "CPN", rewards = hex pur
+    const isCoupon = token.startsWith('CPN')
+    const endpoint = isCoupon
+      ? '/api/admin/validate-coupon'
+      : '/api/admin/validate-redemption'
+
     try {
-      const res  = await fetch('/api/admin/validate-redemption', {
+      const res  = await fetch(endpoint, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ token }),
@@ -48,19 +50,24 @@ export default function ScannerPage() {
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        setErrorKey(data.error ?? 'unknown')
+        const key = data.error ?? 'unknown'
+        setErrorKey(key)
         setErrorMsg(
-          data.error === 'not_found'    ? 'Ce QR code est introuvable dans la base.' :
-          data.error === 'already_used' ? 'Ce QR code a déjà été utilisé.' :
-          data.error === 'expired'      ? 'Ce QR code a expiré (délai de 5 min dépassé).' :
-          data.error === 'unauthorized' ? 'Accès refusé — compte admin requis.' :
-          `Erreur inconnue : ${data.error ?? 'serveur'}`
+          key === 'not_found'    ? 'Ce QR code est introuvable dans la base.' :
+          key === 'already_used' ? 'Ce QR code a déjà été utilisé.' :
+          key === 'expired'      ? 'Ce QR code a expiré.' :
+          key === 'qr_expired'   ? 'Ce QR code a expiré (délai de 5 min dépassé).' :
+          key === 'unauthorized' ? 'Accès refusé — compte admin requis.' :
+          `Erreur inconnue : ${key}`
         )
         setStage('error')
         return
       }
 
-      setOk(data as ValidationOk)
+      setOk(isCoupon
+        ? { kind: 'coupon', ...data } as ValidationOk
+        : { kind: 'reward', ...data } as ValidationOk
+      )
       setStage('success')
     } catch {
       setErrorKey('network')
@@ -140,30 +147,46 @@ export default function ScannerPage() {
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6 gap-6"
           style={{ backgroundColor: '#16A34A' }}
         >
-          {/* Icône */}
           <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl bg-white/20">
             ✅
           </div>
 
-          {/* Titre */}
           <div className="text-center">
             <p className="text-white/80 text-sm font-semibold uppercase tracking-widest">QR CODE VALIDÉ</p>
             <h2 className="text-3xl font-extrabold text-white mt-1">{ok.student_name}</h2>
             <p className="text-white/70 text-sm font-mono mt-1">{ok.student_code}</p>
           </div>
 
-          {/* Carte récompense */}
           <div className="w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl space-y-3">
-            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: '#F0FDF4' }}>
-              <span className="text-4xl">{ok.reward_emoji}</span>
-              <div>
-                <p className="font-extrabold" style={{ color: '#1D3550' }}>{ok.reward_name}</p>
-                <p className="text-sm font-bold" style={{ color: '#16A34A' }}>−{ok.points_spent} pts déduits</p>
-              </div>
-            </div>
-            <p className="text-center text-sm font-semibold text-gray-500">
-              Remettez la récompense à l&apos;étudiant
-            </p>
+            {ok.kind === 'reward' ? (
+              <>
+                <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: '#F0FDF4' }}>
+                  <span className="text-4xl">{ok.reward_emoji}</span>
+                  <div>
+                    <p className="font-extrabold" style={{ color: '#1D3550' }}>{ok.reward_name}</p>
+                    <p className="text-sm font-bold" style={{ color: '#16A34A' }}>−{ok.points_spent} pts déduits</p>
+                  </div>
+                </div>
+                <p className="text-center text-sm font-semibold text-gray-500">
+                  Remettez la récompense à l&apos;étudiant
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: '#F0FDF4' }}>
+                  <span className="text-4xl">{ok.coupon_emoji}</span>
+                  <div>
+                    <p className="font-extrabold" style={{ color: '#1D3550' }}>{ok.coupon_title}</p>
+                    {ok.coupon_description && (
+                      <p className="text-xs text-gray-500">{ok.coupon_description}</p>
+                    )}
+                  </div>
+                </div>
+                <p className="text-center text-sm font-semibold text-gray-500">
+                  Remettez le cadeau à l&apos;étudiant
+                </p>
+              </>
+            )}
           </div>
 
           <button

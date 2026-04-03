@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '@/lib/supabase'
 import { FORMATIONS_ECM } from '@/lib/formations'
+import CouponFlow, { type CouponAssignment } from '@/components/CouponFlow'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -20,22 +21,6 @@ interface Profile {
   student_code:   string | null
   role:           string | null
 }
-
-interface Coupon {
-  id: string
-  emoji: string
-  title: string
-  event: string
-  status: 'available' | 'used'
-  used_at?: string
-}
-
-// ── Mocks ──────────────────────────────────────────────────────────────────
-
-const MOCK_COUPONS: Coupon[] = [
-  { id: '1', emoji: '🥃', title: 'Shot offert',  event: 'Soirée de rentrée BDE', status: 'available' },
-  { id: '2', emoji: '🎟️', title: 'Entrée VIP',   event: 'Afterwork BDS',         status: 'used', used_at: '15 mars 2026' },
-]
 
 const MOCK_STATS = { events_count: 3, games_count: 2 }
 
@@ -243,11 +228,12 @@ export default function ProfilPage() {
   const [profile,     setProfile]     = useState<Profile | null>(null)
   const [userId,      setUserId]      = useState<string | null>(null)
   const [loading,     setLoading]     = useState(true)
-  const [loggingOut,  setLoggingOut]  = useState(false)
-  const [editOpen,    setEditOpen]    = useState(false)
-  const [saveToast,   setSaveToast]   = useState(false)
-  const [couponToast, setCouponToast] = useState(false)
-  const [qrOpen,      setQrOpen]      = useState(false)
+  const [loggingOut,    setLoggingOut]    = useState(false)
+  const [editOpen,      setEditOpen]      = useState(false)
+  const [saveToast,     setSaveToast]     = useState(false)
+  const [qrOpen,        setQrOpen]        = useState(false)
+  const [coupons,       setCoupons]       = useState<CouponAssignment[]>([])
+  const [activeCoupon,  setActiveCoupon]  = useState<CouponAssignment | null>(null)
 
   useEffect(() => {
     async function fetchProfile() {
@@ -309,6 +295,34 @@ export default function ProfilPage() {
 
         console.log('[ProfilPage] built profile → student_code:', built.student_code)
         setProfile(built)
+
+        // Coupons actifs (pending + non expirés)
+        const now = new Date().toISOString()
+        const { data: assignData } = await supabase
+          .from('coupon_assignments')
+          .select('id, coupon_id, status, coupons(emoji, title, description, available_from, expires_at)')
+          .eq('user_id', user.id)
+          .eq('status', 'pending')
+
+        if (assignData) {
+          const active = assignData
+            .filter((a: Record<string, unknown>) => {
+              const c = a.coupons as { expires_at: string } | null
+              return c && c.expires_at > now
+            })
+            .map((a: Record<string, unknown>) => {
+              const c = a.coupons as { emoji: string; title: string; description: string | null; available_from: string; expires_at: string }
+              return {
+                id:             a.id as string,
+                emoji:          c.emoji,
+                title:          c.title,
+                description:    c.description,
+                available_from: c.available_from,
+                expires_at:     c.expires_at,
+              }
+            })
+          setCoupons(active)
+        }
       } catch (err: unknown) {
         const e = err as Record<string, unknown>
         console.error('[ProfilPage] fetchProfile error →', {
@@ -349,11 +363,6 @@ export default function ProfilPage() {
     setTimeout(() => setSaveToast(false), 3000)
   }
 
-  function handleCouponClick() {
-    setCouponToast(true)
-    setTimeout(() => setCouponToast(false), 2500)
-  }
-
   // ── Loading ──────────────────────────────────────────────────────────────
 
   if (loading) {
@@ -387,19 +396,6 @@ export default function ProfilPage() {
         }}
       >
         ✅ Profil mis à jour
-      </div>
-
-      {/* Toast coupon coming soon */}
-      <div
-        className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-xl whitespace-nowrap transition-all duration-300"
-        style={{
-          backgroundColor: '#E8622A',
-          opacity: couponToast ? 1 : 0,
-          transform: `translateX(-50%) translateY(${couponToast ? '0' : '-8px'})`,
-          pointerEvents: 'none',
-        }}
-      >
-        🚧 Bientôt disponible
       </div>
 
       {/* Header */}
@@ -547,57 +543,61 @@ export default function ProfilPage() {
 
         {/* Mes coupons */}
         <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Mes coupons</p>
-            <span
-              className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-              style={{ backgroundColor: '#E8622A' + '15', color: '#E8622A' }}
-            >
-              Bientôt disponible
-            </span>
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">
+            Mes coupons
+          </p>
 
-          <div className="space-y-2.5">
-            {MOCK_COUPONS.map(coupon => (
-              <button
-                key={coupon.id}
-                onClick={handleCouponClick}
-                className="w-full flex items-center gap-3 p-3 rounded-xl text-left transition active:scale-[0.98]"
-                style={{
-                  backgroundColor: coupon.status === 'available' ? '#E8622A' + '08' : '#F3F4F6',
-                  border: `1px solid ${coupon.status === 'available' ? '#E8622A' + '25' : '#E5E7EB'}`,
-                  opacity: coupon.status === 'used' ? 0.6 : 1,
-                }}
-              >
-                <span className="text-2xl flex-shrink-0">{coupon.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <p
-                    className="text-sm font-bold"
+          {coupons.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-3">
+              Aucun coupon disponible pour le moment.
+            </p>
+          ) : (
+            <div className="space-y-2.5">
+              {coupons.map(coupon => {
+                const now       = new Date()
+                const available = new Date(coupon.available_from) <= now
+                return (
+                  <div
+                    key={coupon.id}
+                    className="flex items-center gap-3 p-3 rounded-xl"
                     style={{
-                      color: '#1D3550',
-                      textDecoration: coupon.status === 'used' ? 'line-through' : 'none',
+                      backgroundColor: available ? '#E8622A08' : '#F9FAFB',
+                      border: `1px solid ${available ? '#E8622A25' : '#E5E7EB'}`,
                     }}
                   >
-                    {coupon.title}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate">{coupon.event}</p>
-                  {coupon.status === 'used' && coupon.used_at && (
-                    <p className="text-xs text-gray-400 mt-0.5">Utilisé le {coupon.used_at}</p>
-                  )}
-                </div>
-                <span
-                  className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full"
-                  style={
-                    coupon.status === 'available'
-                      ? { backgroundColor: '#DCFCE7', color: '#16A34A' }
-                      : { backgroundColor: '#F3F4F6', color: '#9CA3AF' }
-                  }
-                >
-                  {coupon.status === 'available' ? 'Disponible' : 'Utilisé'}
-                </span>
-              </button>
-            ))}
-          </div>
+                    <span className="text-2xl flex-shrink-0">{coupon.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate" style={{ color: '#1D3550' }}>
+                        {coupon.title}
+                      </p>
+                      {available ? (
+                        <span className="inline-flex text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5" style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
+                          Disponible
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-medium text-gray-400 mt-0.5 block">
+                          Dispo le {new Date(coupon.available_from).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} à {new Date(coupon.available_from).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    {available ? (
+                      <button
+                        onClick={() => setActiveCoupon(coupon)}
+                        className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold text-white transition active:scale-[0.96]"
+                        style={{ backgroundColor: '#E8622A' }}
+                      >
+                        Utiliser
+                      </button>
+                    ) : (
+                      <span className="flex-shrink-0 text-xs font-semibold text-gray-400 px-3 py-2 rounded-xl bg-gray-100">
+                        Bientôt
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Déconnexion */}
@@ -621,6 +621,14 @@ export default function ProfilPage() {
           userId={userId}
           onClose={() => setEditOpen(false)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {/* CouponFlow plein écran */}
+      {activeCoupon && (
+        <CouponFlow
+          assignment={activeCoupon}
+          onClose={() => setActiveCoupon(null)}
         />
       )}
 
