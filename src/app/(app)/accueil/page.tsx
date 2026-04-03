@@ -258,6 +258,8 @@ export default function AccueilPage() {
       ])
 
       if (eventsRes.error) throw eventsRes.error
+      if (rewardsRes.error) console.error('[Rewards] Erreur query:', rewardsRes.error)
+      console.log('[Rewards] data:', rewardsRes.data)
       setEvents(eventsRes.data && eventsRes.data.length > 0 ? eventsRes.data : MOCK_EVENTS)
       setRewards(rewardsRes.data ?? [])
     } catch (err) {
