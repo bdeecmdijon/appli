@@ -274,51 +274,41 @@ export default function ProfilPage() {
 
         setUserId(user.id)
 
-        let data: Record<string, unknown> | null = null
-
-        // Tentative 1 : requête complète
-        const { data: fullData, error: fullError } = await supabase
+        // Requête principale — toutes les colonnes nécessaires
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('full_name, phone, formation, ecole, autre_ecole, points_balance, student_code, role')
           .eq('id', user.id)
           .single()
 
-        console.log('[ProfilPage] profiles query → data:', fullData)
+        console.log('[ProfilPage] profiles query → raw data:', profileData)
+        console.log('[ProfilPage] profiles query → error:', profileError)
+        console.log('[ProfilPage] student_code from DB:', profileData?.student_code)
 
-        if (fullError) {
-          console.warn('[ProfilPage] full query failed, retrying with base columns →', {
-            message: fullError.message, code: fullError.code,
+        if (profileError) {
+          console.error('[ProfilPage] query error →', {
+            message: profileError.message,
+            code:    profileError.code,
+            details: profileError.details,
+            hint:    profileError.hint,
           })
-          // Tentative 2 : colonnes de base (schema ancien)
-          const { data: baseData, error: baseError } = await supabase
-            .from('profiles')
-            .select('full_name, points_balance')
-            .eq('id', user.id)
-            .single()
-
-          if (baseError) {
-            console.error('[ProfilPage] base query error →', {
-              message: baseError.message, code: baseError.code,
-              details: baseError.details, hint: baseError.hint,
-            })
-            throw baseError
-          }
-          data = baseData as Record<string, unknown>
-        } else {
-          data = fullData as Record<string, unknown>
+          throw profileError
         }
 
-        setProfile({
-          full_name:      (data?.full_name      as string  | null) ?? null,
-          email:          user.email                               ?? '',
-          phone:          (data?.phone          as string  | null) ?? null,
-          formation:      (data?.formation      as string  | null) ?? null,
-          ecole:          (data?.ecole          as string  | null) ?? null,
-          autre_ecole:    (data?.autre_ecole    as string  | null) ?? null,
-          points_balance: (data?.points_balance as number)         ?? 0,
-          student_code:   (data?.student_code  as string  | null) ?? null,
-          role:           (data?.role          as string  | null) ?? null,
-        })
+        const built: Profile = {
+          full_name:      profileData?.full_name      ?? null,
+          email:          user.email                  ?? '',
+          phone:          profileData?.phone          ?? null,
+          formation:      profileData?.formation      ?? null,
+          ecole:          profileData?.ecole          ?? null,
+          autre_ecole:    profileData?.autre_ecole    ?? null,
+          points_balance: profileData?.points_balance ?? 0,
+          student_code:   profileData?.student_code   ?? null,
+          role:           profileData?.role           ?? null,
+        }
+
+        console.log('[ProfilPage] built profile → student_code:', built.student_code)
+        setProfile(built)
       } catch (err: unknown) {
         const e = err as Record<string, unknown>
         console.error('[ProfilPage] fetchProfile error →', {
