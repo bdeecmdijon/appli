@@ -171,7 +171,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#F5F5F5]">
-        <div className="px-5 pt-14 pb-6" style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}>
+        <div className="px-5 pt-5 pb-6" style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}>
           <div className="h-4 w-32 bg-white/20 rounded-full animate-pulse mb-2" />
           <div className="h-7 w-52 bg-white/30 rounded-full animate-pulse" />
         </div>
@@ -195,7 +195,7 @@ export default function DashboardPage() {
 
       {/* Header */}
       <div
-        className="px-5 pt-14 pb-6"
+        className="px-5 pt-5 pb-6"
         style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}
       >
         <p className="text-xs text-white/50 font-medium capitalize">{todayLabel()}</p>
