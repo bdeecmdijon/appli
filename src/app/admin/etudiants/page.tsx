@@ -1,7 +1,13 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { supabase } from '@/lib/supabase'
+
+const QrScanner = dynamic(
+  () => import('@yudiel/react-qr-scanner').then(m => ({ default: m.Scanner })),
+  { ssr: false }
+)
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -312,17 +318,109 @@ function StudentModal({
   )
 }
 
+// ── Composant Scanner QR ───────────────────────────────────────────────────
+
+function QrScanModal({
+  onClose,
+  onStudentFound,
+}: {
+  onClose: () => void
+  onStudentFound: (s: Student) => void
+}) {
+  const [status,   setStatus]   = useState<'scanning' | 'loading' | 'not_found'>('scanning')
+  const [lastCode, setLastCode] = useState('')
+  const cooldownRef = useRef(false)
+
+  async function handleScan(code: string) {
+    if (cooldownRef.current || status !== 'scanning') return
+    if (!code.match(/^ECM-[A-Z0-9]{5,8}$/)) return
+    if (code === lastCode) return
+
+    cooldownRef.current = true
+    setLastCode(code)
+    setStatus('loading')
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at')
+      .eq('student_code', code)
+      .single()
+
+    if (data) {
+      onClose()
+      onStudentFound(data as Student)
+    } else {
+      setStatus('not_found')
+      setTimeout(() => {
+        setStatus('scanning')
+        setLastCode('')
+        cooldownRef.current = false
+      }, 2000)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="flex items-center justify-between px-5 pt-14 pb-4 bg-black">
+        <h2 className="text-lg font-extrabold text-white">Scanner un étudiant</h2>
+        <button onClick={onClose} className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-4 h-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="flex-1 flex flex-col">
+        <div className="flex-1 relative overflow-hidden">
+          {status === 'scanning' && (
+            <QrScanner
+              onScan={(codes) => { const raw = codes?.[0]?.rawValue; if (raw) handleScan(raw) }}
+              constraints={{ facingMode: 'environment' }}
+              styles={{ container: { width: '100%', height: '100%' }, video: { objectFit: 'cover' } }}
+            />
+          )}
+          {status === 'loading' && (
+            <div className="absolute inset-0 bg-black flex items-center justify-center">
+              <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            </div>
+          )}
+          {status === 'not_found' && (
+            <div className="absolute inset-0 bg-black flex flex-col items-center justify-center gap-4">
+              <div className="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center text-4xl">❌</div>
+              <p className="text-white font-bold">Code non reconnu</p>
+              <p className="text-white/50 text-sm font-mono" style={{ color: '#E8622A' }}>{lastCode}</p>
+            </div>
+          )}
+          {status === 'scanning' && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-56 h-56 relative">
+                {['top-0 left-0 border-t-4 border-l-4 rounded-tl-2xl','top-0 right-0 border-t-4 border-r-4 rounded-tr-2xl','bottom-0 left-0 border-b-4 border-l-4 rounded-bl-2xl','bottom-0 right-0 border-b-4 border-r-4 rounded-br-2xl'].map((cls, i) => (
+                  <div key={i} className={`absolute w-8 h-8 ${cls}`} style={{ borderColor: '#E8622A' }} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="px-5 py-6 bg-black">
+          <p className="text-white/60 text-sm text-center">Pointe la caméra sur le QR code de l&apos;étudiant</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function EtudiantsPage() {
-  const [students,   setStudents]   = useState<Student[]>([])
-  const [total,      setTotal]      = useState(0)
-  const [loading,    setLoading]    = useState(true)
-  const [search,     setSearch]     = useState('')
-  const [page,       setPage]       = useState(0)
-  const [sortCol,    setSortCol]    = useState<SortCol>('full_name')
-  const [sortDir,    setSortDir]    = useState<SortDir>('asc')
-  const [selected,   setSelected]   = useState<Student | null>(null)
+  const [students,     setStudents]     = useState<Student[]>([])
+  const [total,        setTotal]        = useState(0)
+  const [loading,      setLoading]      = useState(true)
+  const [search,       setSearch]       = useState('')
+  const [page,         setPage]         = useState(0)
+  const [sortCol,      setSortCol]      = useState<SortCol>('full_name')
+  const [sortDir,      setSortDir]      = useState<SortDir>('asc')
+  const [selected,     setSelected]     = useState<Student | null>(null)
+  const [scannerOpen,  setScannerOpen]  = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -401,9 +499,24 @@ export default function EtudiantsPage() {
         className="px-5 pt-14 pb-5"
         style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}
       >
-        <p className="text-sm text-white/50 font-medium">Administration</p>
-        <h1 className="text-2xl font-extrabold text-white mt-0.5">Étudiants</h1>
-        <p className="text-sm text-white/40 mt-0.5">{total} étudiant{total !== 1 ? 's' : ''} au total</p>
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm text-white/50 font-medium">Administration</p>
+            <h1 className="text-2xl font-extrabold text-white mt-0.5">Étudiants</h1>
+            <p className="text-sm text-white/40 mt-0.5">{total} étudiant{total !== 1 ? 's' : ''} au total</p>
+          </div>
+          <button
+            onClick={() => setScannerOpen(true)}
+            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 mt-1 transition active:scale-[0.93]"
+            style={{ backgroundColor: '#E8622A' }}
+            aria-label="Scanner QR code"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75h-.75v-.75z" />
+            </svg>
+          </button>
+        </div>
 
         {/* Barre de recherche */}
         <div className="relative mt-4">
@@ -538,6 +651,14 @@ export default function EtudiantsPage() {
           student={selected}
           onClose={() => setSelected(null)}
           onPointsUpdated={handlePointsUpdated}
+        />
+      )}
+
+      {/* Scanner QR */}
+      {scannerOpen && (
+        <QrScanModal
+          onClose={() => setScannerOpen(false)}
+          onStudentFound={(s) => { setScannerOpen(false); setSelected(s) }}
         />
       )}
     </div>

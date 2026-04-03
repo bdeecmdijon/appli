@@ -73,11 +73,17 @@ function PartnerFormModal({
   async function uploadLogo(file: File): Promise<string | null> {
     const ext  = file.name.split('.').pop() ?? 'jpg'
     const path = `logos/${Date.now()}.${ext}`
+    console.log('[uploadLogo] Uploading to bucket "partners", path:', path)
     const { data, error: upErr } = await supabase.storage
-      .from('partner-logos')
+      .from('partners')
       .upload(path, file, { upsert: true })
-    if (upErr || !data) return null
-    return supabase.storage.from('partner-logos').getPublicUrl(data.path).data.publicUrl
+    if (upErr || !data) {
+      console.error('[uploadLogo] Upload error:', upErr?.message)
+      return null
+    }
+    const publicUrl = supabase.storage.from('partners').getPublicUrl(data.path).data.publicUrl
+    console.log('[uploadLogo] Public URL:', publicUrl)
+    return publicUrl
   }
 
   async function handleSubmit(e: React.FormEvent) {
