@@ -406,13 +406,14 @@ export default function AccueilPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4">
         <div>
-          <p className="text-sm text-gray-400 font-medium">BDE ECM Dijon</p>
-          <h1 className="text-2xl font-bold mt-0.5" style={{ color: '#1D3550' }}>
+          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#E8622A' }}>BDE ECM Dijon</p>
+          <h1 className="text-2xl font-extrabold mt-0.5" style={{ color: '#1D3550' }}>
             Bonjour{firstName ? ` ${firstName}` : ''} 👋
           </h1>
         </div>
-        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200">
-          <Image src="/logobde.PNG" alt="Logo BDE" width={48} height={48} className="object-contain" />
+        <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #1D3550, #2E5A8A)', boxShadow: '0 4px 12px rgba(29,53,80,0.25)' }}>
+          <Image src="/logobde.PNG" alt="Logo BDE" width={40} height={40} className="object-contain" />
         </div>
       </div>
 
@@ -452,23 +453,45 @@ export default function AccueilPage() {
 
         {/* ── Carte points ── */}
         <div
-          className="rounded-2xl p-5 text-white shadow-lg"
-          style={{ background: 'linear-gradient(135deg, #1D3550 0%, #2E5A8A 100%)' }}
+          className="rounded-3xl p-5 text-white overflow-hidden relative"
+          style={{
+            background:  'linear-gradient(135deg, #0F1E38 0%, #1D3550 50%, #2A4A73 100%)',
+            boxShadow:   '0 8px 32px rgba(13,27,60,0.35)',
+          }}
         >
-          <p className="text-sm text-white/60 font-medium mb-1">Mes points</p>
+          {/* Orbe décoratif */}
+          <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-10"
+            style={{ background: 'radial-gradient(circle, #E8622A, transparent)' }} />
+
+          <p className="text-xs text-white/50 font-semibold uppercase tracking-widest mb-1">Mes points</p>
           <div className="flex items-end gap-2 mb-4">
-            <span className="text-5xl font-extrabold tracking-tight" style={{ color: '#E8622A' }}>
+            <span
+              className="text-5xl font-extrabold tracking-tight leading-none"
+              style={{
+                background:             'linear-gradient(135deg, #FF8C42 0%, #E8622A 100%)',
+                WebkitBackgroundClip:   'text',
+                WebkitTextFillColor:    'transparent',
+                backgroundClip:         'text',
+              }}
+            >
               {points.toLocaleString('fr-FR')}
             </span>
-            <span className="text-xl font-semibold text-white/80 mb-1">points</span>
+            <span className="text-base font-semibold text-white/60 mb-1">pts</span>
           </div>
 
           <button
             onClick={() => setSheetOpen(true)}
-            className="w-full py-2.5 rounded-xl text-sm font-bold transition active:scale-[0.97] mb-4"
-            style={{ backgroundColor: '#E8622A', color: '#fff' }}
+            className="w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] mb-4 flex items-center justify-center gap-1.5"
+            style={{
+              background:  'linear-gradient(135deg, #E8622A, #FF6B35)',
+              boxShadow:   '0 4px 16px rgba(232,98,42,0.4)',
+              color:       '#fff',
+            }}
           >
-            Dépenser mes points →
+            Dépenser mes points
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M3 10a.75.75 0 01.75-.75h10.638L10.23 5.29a.75.75 0 111.04-1.08l5.5 5.25a.75.75 0 010 1.08l-5.5 5.25a.75.75 0 11-1.04-1.08l4.158-3.96H3.75A.75.75 0 013 10z" clipRule="evenodd" />
+            </svg>
           </button>
 
           {/* Barre Bronze / Argent / Or */}
@@ -477,31 +500,35 @@ export default function AccueilPage() {
               {TIERS.map((tier, i) => (
                 <span
                   key={tier.name}
-                  className="text-xs font-semibold"
-                  style={{ color: i <= tierIdx ? tier.color : 'rgba(255,255,255,0.35)' }}
+                  className="text-xs font-semibold transition-colors duration-300"
+                  style={{ color: i <= tierIdx ? tier.color : 'rgba(255,255,255,0.25)' }}
                 >
                   {tier.name}
                 </span>
               ))}
             </div>
-            <div className="relative h-2 rounded-full bg-white/20 overflow-hidden">
+            <div className="relative h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
               <div className="absolute inset-0 flex">
                 {TIERS.slice(0, -1).map((_, i) => (
-                  <div key={i} className="h-full border-r border-white/30" style={{ width: `${100 / (TIERS.length - 1)}%` }} />
+                  <div key={i} className="h-full border-r border-white/10" style={{ width: `${100 / (TIERS.length - 1)}%` }} />
                 ))}
               </div>
               <div
                 className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
-                style={{ width: `${barWidth}%`, backgroundColor: currentTier.color }}
+                style={{
+                  width:      `${barWidth}%`,
+                  background: `linear-gradient(90deg, ${currentTier.color}99, ${currentTier.color})`,
+                  boxShadow:  `0 0 8px ${currentTier.color}80`,
+                }}
               />
             </div>
             <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-white/50">
-                Palier : <span className="font-semibold" style={{ color: currentTier.color }}>{currentTier.name}</span>
+              <span className="text-xs text-white/40">
+                Palier <span className="font-bold" style={{ color: currentTier.color }}>{currentTier.name}</span>
               </span>
               {nextTier && (
-                <span className="text-xs text-white/50">
-                  <span className="font-semibold text-white/80">{nextTier.min - points} pts</span> avant {nextTier.name}
+                <span className="text-xs text-white/40">
+                  <span className="font-bold text-white/70">{nextTier.min - points} pts</span> avant {nextTier.name}
                 </span>
               )}
             </div>
@@ -518,31 +545,42 @@ export default function AccueilPage() {
           const unlocked = rewards.filter(r => r.points_required <= points)
 
           return (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-              <p className="text-sm font-bold" style={{ color: '#1D3550' }}>🎯 Prochain palier</p>
+            <div className="rounded-3xl p-4 space-y-3 border border-gray-100"
+              style={{ backgroundColor: '#fff', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+              <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#9CA3AF' }}>🎯 Prochain palier</p>
 
               {next ? (
                 <>
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{next.emoji}</span>
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0"
+                      style={{ background: 'linear-gradient(135deg, #FFF4EE, #FFE8D6)' }}>
+                      {next.emoji}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold" style={{ color: '#1D3550' }}>{next.name}</p>
+                      <p className="text-sm font-extrabold leading-tight" style={{ color: '#1D3550' }}>{next.name}</p>
                       {next.description && (
-                        <p className="text-xs text-gray-400 truncate">{next.description}</p>
+                        <p className="text-xs text-gray-400 truncate mt-0.5">{next.description}</p>
                       )}
                     </div>
+                    <span className="text-xs font-bold flex-shrink-0" style={{ color: '#E8622A' }}>
+                      {next.points_required} pts
+                    </span>
                   </div>
                   <div>
-                    <div className="h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: '#F3F4F6' }}>
+                    <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: '#F3F4F6' }}>
                       <div
                         className="h-full rounded-full transition-all duration-700"
-                        style={{ width: `${pct}%`, backgroundColor: '#E8622A' }}
+                        style={{
+                          width:      `${pct}%`,
+                          background: 'linear-gradient(90deg, #E8622A, #FF6B35)',
+                          boxShadow:  '0 0 8px rgba(232,98,42,0.4)',
+                        }}
                       />
                     </div>
                     <div className="flex justify-between mt-1.5">
                       <p className="text-xs text-gray-400">{points} / {next.points_required} pts</p>
-                      <p className="text-xs font-semibold" style={{ color: '#E8622A' }}>
-                        {next.points_required - points} pts manquants
+                      <p className="text-xs font-bold" style={{ color: '#E8622A' }}>
+                        −{next.points_required - points} pts
                       </p>
                     </div>
                   </div>
@@ -553,22 +591,22 @@ export default function AccueilPage() {
                 </p>
               )}
 
-              {/* Paliers débloqués disponibles à échanger */}
+              {/* Paliers débloqués */}
               {unlocked.length > 0 && (
                 <div className="border-t border-gray-100 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-gray-500">Disponibles à échanger</p>
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Disponibles</p>
                   {unlocked.map(r => (
-                    <div key={r.id} className="flex items-center gap-3 rounded-xl p-3"
-                      style={{ backgroundColor: '#FFF4EE' }}>
+                    <div key={r.id} className="flex items-center gap-3 rounded-2xl p-3"
+                      style={{ background: 'linear-gradient(135deg, #FFF4EE, #FFF9F6)', border: '1px solid #FEDDCC' }}>
                       <span className="text-xl flex-shrink-0">{r.emoji}</span>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold truncate" style={{ color: '#1D3550' }}>{r.name}</p>
+                        <p className="text-xs font-extrabold truncate" style={{ color: '#1D3550' }}>{r.name}</p>
                         <p className="text-xs font-bold" style={{ color: '#E8622A' }}>{r.points_required} pts</p>
                       </div>
                       <button
                         onClick={() => setActiveReward(r)}
-                        className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition active:scale-[0.96]"
-                        style={{ backgroundColor: '#E8622A' }}
+                        className="flex-shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all duration-200 active:scale-[0.94]"
+                        style={{ background: 'linear-gradient(135deg, #E8622A, #FF6B35)', boxShadow: '0 2px 8px rgba(232,98,42,0.35)' }}
                       >
                         Échanger
                       </button>
@@ -598,7 +636,8 @@ export default function AccueilPage() {
                   <Link
                     key={event.id}
                     href={`/accueil/${event.id}`}
-                    className="flex-shrink-0 w-52 rounded-2xl overflow-hidden border border-gray-100 shadow-sm active:scale-[0.98] transition-transform flex flex-col"
+                    className="flex-shrink-0 w-52 rounded-2xl overflow-hidden active:scale-[0.96] transition-all duration-200 flex flex-col"
+                    style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.10)', border: '1px solid rgba(0,0,0,0.06)' }}
                   >
                     <div className="relative w-full" style={{ aspectRatio: '4/5' }}>
                       {event.cover_url ? (
