@@ -12,12 +12,12 @@ const QrScanner = dynamic(
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface ValidationResult {
-  student_name:  string
-  student_code:  string
-  reward_name:   string
-  reward_emoji:  string
-  points_spent:  number
+interface ValidationOk {
+  student_name: string
+  student_code: string
+  reward_name:  string
+  reward_emoji: string
+  points_spent: number
 }
 
 type Stage = 'scanning' | 'loading' | 'success' | 'error'
@@ -25,21 +25,18 @@ type Stage = 'scanning' | 'loading' | 'success' | 'error'
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function ScannerPage() {
-  const [stage,      setStage]      = useState<Stage>('scanning')
-  const [result,     setResult]     = useState<ValidationResult | null>(null)
-  const [errorMsg,   setErrorMsg]   = useState<string | null>(null)
-  const [lastToken,  setLastToken]  = useState('')
-  const cooldownRef = useRef(false)
+  const [stage,    setStage]    = useState<Stage>('scanning')
+  const [ok,       setOk]       = useState<ValidationOk | null>(null)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [errorKey, setErrorKey] = useState<string | null>(null)
+  const processingRef = useRef(false)
 
   async function handleScan(rawValue: string) {
-    // Token format: 16-char hex uppercase
+    if (processingRef.current) return
     const token = rawValue.trim().toUpperCase()
-    if (!token.match(/^[A-F0-9]{16}$/)) return
-    if (token === lastToken) return
-    if (cooldownRef.current) return
+    if (!token) return
 
-    cooldownRef.current = true
-    setLastToken(token)
+    processingRef.current = true
     setStage('loading')
 
     try {
@@ -51,131 +48,46 @@ export default function ScannerPage() {
       const data = await res.json()
 
       if (!res.ok || data.error) {
-        const msg = data.error === 'not_found'    ? 'QR code introuvable.'
-          : data.error === 'already_used' ? 'QR code déjà utilisé.'
-          : data.error === 'expired'      ? 'QR code expiré.'
-          : data.error === 'unauthorized' ? 'Accès non autorisé.'
-          : `Erreur : ${data.error ?? 'inconnue'}`
-        setErrorMsg(msg)
+        setErrorKey(data.error ?? 'unknown')
+        setErrorMsg(
+          data.error === 'not_found'    ? 'Ce QR code est introuvable dans la base.' :
+          data.error === 'already_used' ? 'Ce QR code a déjà été utilisé.' :
+          data.error === 'expired'      ? 'Ce QR code a expiré (délai de 5 min dépassé).' :
+          data.error === 'unauthorized' ? 'Accès refusé — compte admin requis.' :
+          `Erreur inconnue : ${data.error ?? 'serveur'}`
+        )
         setStage('error')
         return
       }
 
-      setResult(data as ValidationResult)
+      setOk(data as ValidationOk)
       setStage('success')
     } catch {
-      setErrorMsg('Impossible de contacter le serveur.')
+      setErrorKey('network')
+      setErrorMsg('Impossible de joindre le serveur.')
       setStage('error')
     }
   }
 
   function reset() {
     setStage('scanning')
-    setResult(null)
+    setOk(null)
     setErrorMsg(null)
-    setLastToken('')
-    cooldownRef.current = false
+    setErrorKey(null)
+    processingRef.current = false
   }
-
-  // ── Loading ─────────────────────────────────────────────────────────────
-
-  if (stage === 'loading') {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ backgroundColor: '#1D3550' }}>
-        <div className="w-12 h-12 rounded-full border-white/20 border-t-white animate-spin" style={{ borderWidth: '3px', borderStyle: 'solid' }} />
-        <p className="text-white text-sm font-semibold">Validation en cours…</p>
-      </div>
-    )
-  }
-
-  // ── Succès ──────────────────────────────────────────────────────────────
-
-  if (stage === 'success' && result) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-6" style={{ backgroundColor: '#1D3550' }}>
-        <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-          ✅
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-2xl font-extrabold text-white">Échange validé !</h2>
-          <p className="text-white/60 text-sm mt-1">La récompense a été consommée.</p>
-        </div>
-
-        <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-2xl space-y-4">
-          {/* Récompense */}
-          <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: '#FFF7F4' }}>
-            <span className="text-3xl">{result.reward_emoji}</span>
-            <div>
-              <p className="font-extrabold text-sm" style={{ color: '#1D3550' }}>{result.reward_name}</p>
-              <p className="text-xs font-bold" style={{ color: '#E8622A' }}>−{result.points_spent} pts</p>
-            </div>
-          </div>
-
-          {/* Étudiant */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-sm font-extrabold flex-shrink-0" style={{ backgroundColor: '#E8622A' }}>
-              {(result.student_name ?? '?').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
-            </div>
-            <div>
-              <p className="font-bold text-sm" style={{ color: '#1D3550' }}>{result.student_name}</p>
-              <p className="text-xs font-mono text-gray-400">{result.student_code}</p>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={reset}
-          className="w-full max-w-sm h-13 rounded-2xl font-bold text-white border border-white/20 transition active:scale-[0.98]"
-          style={{ height: '52px', backgroundColor: 'rgba(255,255,255,0.1)' }}
-        >
-          Scanner un autre QR code
-        </button>
-      </div>
-    )
-  }
-
-  // ── Erreur ──────────────────────────────────────────────────────────────
-
-  if (stage === 'error') {
-    const isAlreadyUsed = errorMsg?.includes('déjà utilisé')
-    const isExpired     = errorMsg?.includes('expiré')
-
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-6" style={{ backgroundColor: '#1D3550' }}>
-        <div className="w-24 h-24 rounded-full flex items-center justify-center text-5xl" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
-          {isAlreadyUsed ? '⚠️' : isExpired ? '⏰' : '❌'}
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-2xl font-extrabold text-white">
-            {isAlreadyUsed ? 'Déjà utilisé' : isExpired ? 'QR code expiré' : 'Validation impossible'}
-          </h2>
-          <p className="text-white/60 text-sm mt-1">{errorMsg}</p>
-        </div>
-
-        <button
-          onClick={reset}
-          className="px-8 h-13 rounded-2xl font-bold text-white"
-          style={{ height: '52px', backgroundColor: '#E8622A' }}
-        >
-          Rescanner
-        </button>
-      </div>
-    )
-  }
-
-  // ── Scanner ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: '#000' }}>
-      {/* Header */}
+    <div className="min-h-screen flex flex-col bg-black">
+      {/* ── Header ── */}
       <div className="px-5 pt-8 pb-4 bg-black">
         <h1 className="text-xl font-extrabold text-white">Scanner QR récompense</h1>
-        <p className="text-white/50 text-sm mt-0.5">Scanne le QR code généré par l&apos;étudiant</p>
+        <p className="text-white/50 text-sm mt-0.5">
+          Scanne le QR code généré par l&apos;étudiant
+        </p>
       </div>
 
-      {/* Caméra */}
+      {/* ── Caméra (toujours montée) ── */}
       <div className="flex-1 relative overflow-hidden" style={{ minHeight: '60vh' }}>
         <QrScanner
           onScan={(codes) => {
@@ -203,22 +115,105 @@ export default function ScannerPage() {
         </div>
       </div>
 
-      {/* Footer */}
+      {/* ── Saisie manuelle ── */}
       <div className="px-5 py-6 bg-black">
-        <p className="text-white/50 text-sm text-center">
+        <p className="text-white/50 text-sm text-center mb-4">
           Pointe la caméra sur le QR code de l&apos;étudiant
         </p>
-
-        {/* Saisie manuelle */}
-        <ManualInput onSubmit={handleScan} />
+        <ManualInput onSubmit={handleScan} disabled={stage !== 'scanning'} />
       </div>
+
+      {/* ── Overlay résultat (fixed = par-dessus l'admin layout) ── */}
+
+      {/* Loading */}
+      {stage === 'loading' && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-5"
+          style={{ backgroundColor: '#1D3550' }}>
+          <div
+            className="w-14 h-14 rounded-full animate-spin"
+            style={{ border: '4px solid rgba(255,255,255,0.2)', borderTopColor: '#fff' }}
+          />
+          <p className="text-white font-bold text-lg">Validation en cours…</p>
+        </div>
+      )}
+
+      {/* Succès */}
+      {stage === 'success' && ok && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6 gap-6"
+          style={{ backgroundColor: '#16A34A' }}
+        >
+          {/* Icône */}
+          <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl bg-white/20">
+            ✅
+          </div>
+
+          {/* Titre */}
+          <div className="text-center">
+            <p className="text-white/80 text-sm font-semibold uppercase tracking-widest">QR CODE VALIDÉ</p>
+            <h2 className="text-3xl font-extrabold text-white mt-1">{ok.student_name}</h2>
+            <p className="text-white/70 text-sm font-mono mt-1">{ok.student_code}</p>
+          </div>
+
+          {/* Carte récompense */}
+          <div className="w-full max-w-sm bg-white rounded-3xl p-5 shadow-2xl space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-2xl" style={{ backgroundColor: '#F0FDF4' }}>
+              <span className="text-4xl">{ok.reward_emoji}</span>
+              <div>
+                <p className="font-extrabold" style={{ color: '#1D3550' }}>{ok.reward_name}</p>
+                <p className="text-sm font-bold" style={{ color: '#16A34A' }}>−{ok.points_spent} pts déduits</p>
+              </div>
+            </div>
+            <p className="text-center text-sm font-semibold text-gray-500">
+              Remettez la récompense à l&apos;étudiant
+            </p>
+          </div>
+
+          <button
+            onClick={reset}
+            className="w-full max-w-sm h-14 rounded-2xl font-bold text-green-700 bg-white transition active:scale-[0.98] text-base"
+          >
+            Scanner un autre QR code
+          </button>
+        </div>
+      )}
+
+      {/* Erreur */}
+      {stage === 'error' && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center px-6 gap-6"
+          style={{ backgroundColor: '#DC2626' }}
+        >
+          {/* Icône */}
+          <div className="w-28 h-28 rounded-full flex items-center justify-center text-6xl bg-white/20">
+            {errorKey === 'already_used' ? '⚠️' : errorKey === 'expired' ? '⏰' : '❌'}
+          </div>
+
+          {/* Titre */}
+          <div className="text-center">
+            <p className="text-white/80 text-sm font-semibold uppercase tracking-widest">
+              {errorKey === 'already_used' ? 'Déjà utilisé'
+                : errorKey === 'expired'   ? 'QR code expiré'
+                : 'Validation impossible'}
+            </p>
+            <h2 className="text-2xl font-extrabold text-white mt-2">{errorMsg}</h2>
+          </div>
+
+          <button
+            onClick={reset}
+            className="w-full max-w-sm h-14 rounded-2xl font-bold text-red-600 bg-white transition active:scale-[0.98] text-base"
+          >
+            Réessayer
+          </button>
+        </div>
+      )}
     </div>
   )
 }
 
 // ── Saisie manuelle ────────────────────────────────────────────────────────
 
-function ManualInput({ onSubmit }: { onSubmit: (token: string) => void }) {
+function ManualInput({ onSubmit, disabled }: { onSubmit: (token: string) => void; disabled: boolean }) {
   const [open,  setOpen]  = useState(false)
   const [value, setValue] = useState('')
 
@@ -234,7 +229,8 @@ function ManualInput({ onSubmit }: { onSubmit: (token: string) => void }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="w-full mt-4 h-11 rounded-2xl text-sm font-bold border border-white/20 text-white/70 transition active:scale-[0.97]"
+        disabled={disabled}
+        className="w-full h-11 rounded-2xl text-sm font-bold border border-white/20 text-white/70 transition active:scale-[0.97] disabled:opacity-40"
       >
         Saisir un code manuellement
       </button>
@@ -242,14 +238,13 @@ function ManualInput({ onSubmit }: { onSubmit: (token: string) => void }) {
   }
 
   return (
-    <div className="mt-4 flex gap-2">
+    <div className="flex gap-2">
       <input
         autoFocus
         value={value}
         onChange={e => setValue(e.target.value.toUpperCase())}
         onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-        placeholder="Code 16 caractères…"
-        maxLength={16}
+        placeholder="Colle le code ici…"
         className="flex-1 h-11 px-3 rounded-xl text-sm font-mono outline-none bg-white/10 text-white placeholder-white/30 border border-white/20 focus:border-[#E8622A]"
       />
       <button
@@ -258,7 +253,7 @@ function ManualInput({ onSubmit }: { onSubmit: (token: string) => void }) {
         className="h-11 px-4 rounded-xl font-bold text-white text-sm disabled:opacity-40"
         style={{ backgroundColor: '#E8622A' }}
       >
-        Valider
+        OK
       </button>
     </div>
   )
