@@ -135,7 +135,6 @@ function RewardsSheet({
         onClose={() => { setActiveReward(null); onClose() }}
         onSuccess={(newBalance) => {
           onPointsUpdated(newBalance)
-          setActiveReward(null)
         }}
       />
     )
