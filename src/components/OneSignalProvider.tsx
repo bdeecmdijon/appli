@@ -24,22 +24,8 @@ export default function OneSignalProvider() {
           serviceWorkerPath:           '/OneSignalSDKWorker.js',
         })
 
-        console.log('[OneSignal] initialisé ✓')
-
-        // Permission via API native (seule fiable sur iOS PWA)
-        const permission = 'Notification' in window ? Notification.permission : 'unsupported'
-        console.log('[OneSignal] permission navigateur:', permission)
-
-        // Statut abonnement OneSignal
-        const optedIn = OneSignal.User.PushSubscription.optedIn
-        console.log('[OneSignal] optedIn:', optedIn)
-
-        // Associe l'user Supabase si déjà connecté
         const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          console.log('[OneSignal] login avec userId:', user.id)
-          await OneSignal.login(user.id)
-        }
+        if (user) await OneSignal.login(user.id)
       } catch (err) {
         console.error('[OneSignal] Erreur init:', err)
       }
@@ -53,10 +39,8 @@ export default function OneSignalProvider() {
         try {
           const OneSignal = (await import('react-onesignal')).default
           if (event === 'SIGNED_IN' && session?.user) {
-            console.log('[OneSignal] SIGNED_IN → login', session.user.id)
             await OneSignal.login(session.user.id)
           } else if (event === 'SIGNED_OUT') {
-            console.log('[OneSignal] SIGNED_OUT → logout')
             await OneSignal.logout()
           }
         } catch (err) {

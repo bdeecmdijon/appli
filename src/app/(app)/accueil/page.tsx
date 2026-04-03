@@ -220,7 +220,6 @@ export default function AccueilPage() {
   const [tierUpName,           setTierUpName]           = useState<string | null>(null)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true) // true par défaut pour éviter le flash
   const [iosUnsupported,       setIosUnsupported]       = useState(false)
-  const [debugLogs,            setDebugLogs]            = useState<string[]>([])
 
   // Ref pour détecter le changement de palier sans déclencher au premier chargement
   const prevTierRef   = useRef<number | null>(null)
@@ -284,11 +283,6 @@ export default function AccueilPage() {
 
   // ── Notifications ──────────────────────────────────────────────────────
 
-  function addLog(msg: string) {
-    console.log(msg)
-    setDebugLogs(prev => [`${new Date().toLocaleTimeString()}: ${msg}`, ...prev].slice(0, 20))
-  }
-
   function getIOSVersion(): number {
     const match = navigator.userAgent.match(/OS (\d+)_(\d+)/)
     return match ? parseFloat(`${match[1]}.${match[2]}`) : 0
@@ -297,13 +291,8 @@ export default function AccueilPage() {
   useEffect(() => {
     if (!('Notification' in window)) return
 
-    const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-    const iosVersion   = isIOS ? getIOSVersion() : 99
-
-    addLog(`UA: ${navigator.userAgent.slice(0, 60)}`)
-    addLog(`iOS: ${isIOS} | standalone: ${isStandalone} | version: ${iosVersion}`)
-    addLog(`Notification.permission: ${Notification.permission}`)
+    const isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const iosVersion = isIOS ? getIOSVersion() : 99
 
     if (isIOS && iosVersion < 16.4) {
       setIosUnsupported(true)
@@ -321,18 +310,13 @@ export default function AccueilPage() {
   }
 
   async function registerNativePush() {
-    addLog('Enregistrement SW natif…')
     const reg = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
-    addLog('SW prêt ✓')
 
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-    addLog('Abonnement PushManager…')
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly:      true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
     })
-    addLog(`Endpoint: ${sub.endpoint.slice(0, 40)}…`)
 
     const subJson = sub.toJSON()
     const res = await fetch('/api/push/subscribe', {
@@ -342,39 +326,23 @@ export default function AccueilPage() {
     })
     const json = await res.json()
     if (!res.ok) throw new Error(json.error ?? 'Erreur sauvegarde subscription')
-    addLog('Subscription enregistrée ✓')
   }
 
   async function handleEnableNotifications() {
     try {
-      const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-
-      addLog(`Activation — iOS: ${isIOS}, standalone: ${isStandalone}`)
-      addLog('Appel Notification.requestPermission()…')
-
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       const permission = await Notification.requestPermission()
-      addLog(`permission reçue: ${permission}`)
 
       if (permission === 'granted') {
         if (isIOS) {
           await registerNativePush()
         } else {
-          addLog('Import OneSignal…')
           const OneSignal = (await import('react-onesignal')).default
           await OneSignal.User.PushSubscription.optIn()
-          const sub    = OneSignal.User.PushSubscription
-          const userId = OneSignal.User.onesignalId
-          addLog(`optedIn: ${sub.optedIn}`)
-          addLog(`id: ${sub.id ?? 'null'}`)
-          addLog(`token: ${sub.token ? sub.token.slice(0, 20) + '…' : 'null'}`)
-          addLog(`OneSignal User ID: ${userId ?? 'null'}`)
         }
         setNotificationsEnabled(true)
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      addLog(`ERREUR: ${msg}`)
       console.error('[Notif] Erreur:', err)
     }
   }
@@ -476,16 +444,6 @@ export default function AccueilPage() {
             >
               Activer
             </button>
-          </div>
-        )}
-
-        {/* ── Debug logs (temporairement toujours visible) ── */}
-        {debugLogs.length > 0 && (
-          <div className="rounded-xl p-3 space-y-0.5" style={{ backgroundColor: '#0F172A' }}>
-            <p className="text-[10px] font-bold text-white/40 mb-1">DEBUG NOTIFICATIONS</p>
-            {debugLogs.map((log, i) => (
-              <p key={i} className="text-[10px] font-mono text-green-400 leading-tight">{log}</p>
-            ))}
           </div>
         )}
 

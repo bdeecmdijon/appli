@@ -243,16 +243,13 @@ export default function ProfilPage() {
   const [activeCoupon,  setActiveCoupon]  = useState<CouponRow | null>(null)
   const [notifGranted,    setNotifGranted]    = useState<boolean | null>(null)
   const [iosUnsupported,  setIosUnsupported]  = useState(false)
-  const [debugLogs,       setDebugLogs]       = useState<string[]>([])
 
   useEffect(() => {
     async function fetchProfile() {
       try {
-        const { data: { user }, error: authErr } = await supabase.auth.getUser()
-        console.log('[ProfilPage] auth.getUser →', user?.id, authErr)
+        const { data: { user } } = await supabase.auth.getUser()
 
         if (!user) {
-          console.warn('[ProfilPage] No user found, showing mock data')
           setProfile({
             full_name:      'Thomas Dupont',
             email:          'thomas.dupont@ecm-dijon.fr',
@@ -277,19 +274,7 @@ export default function ProfilPage() {
           .eq('id', user.id)
           .single()
 
-        console.log('[ProfilPage] profiles query → raw data:', profileData)
-        console.log('[ProfilPage] profiles query → error:', profileError)
-        console.log('[ProfilPage] student_code from DB:', profileData?.student_code)
-
-        if (profileError) {
-          console.error('[ProfilPage] query error →', {
-            message: profileError.message,
-            code:    profileError.code,
-            details: profileError.details,
-            hint:    profileError.hint,
-          })
-          throw profileError
-        }
+        if (profileError) throw profileError
 
         const built: Profile = {
           full_name:      profileData?.full_name      ?? null,
@@ -303,7 +288,6 @@ export default function ProfilPage() {
           role:           profileData?.role           ?? null,
         }
 
-        console.log('[ProfilPage] built profile → student_code:', built.student_code)
         setProfile(built)
 
         // Coupons : pending non expirés + utilisés il y a moins de 2h
@@ -354,15 +338,7 @@ export default function ProfilPage() {
           setCoupons(rows)
         }
       } catch (err: unknown) {
-        const e = err as Record<string, unknown>
-        console.error('[ProfilPage] fetchProfile error →', {
-          message: e?.message,
-          code:    e?.code,
-          details: e?.details,
-          hint:    e?.hint,
-          status:  e?.status,
-          raw:     String(err),
-        })
+        console.error('[ProfilPage] fetchProfile error:', err)
         setProfile({
           full_name:      'Thomas Dupont',
           email:          'thomas.dupont@ecm-dijon.fr',
@@ -381,24 +357,16 @@ export default function ProfilPage() {
     fetchProfile()
   }, [])
 
-  function addLog(msg: string) {
-    console.log(msg)
-    setDebugLogs(prev => [`${new Date().toLocaleTimeString()}: ${msg}`, ...prev].slice(0, 20))
-  }
-
   function getIOSVersion(): number {
     const match = navigator.userAgent.match(/OS (\d+)_(\d+)/)
     return match ? parseFloat(`${match[1]}.${match[2]}`) : 0
   }
 
-  // Vérifie la permission via l'API native (fonctionne iOS PWA)
   useEffect(() => {
     if (!('Notification' in window)) return
 
     const isIOS      = /iPad|iPhone|iPod/.test(navigator.userAgent)
     const iosVersion = isIOS ? getIOSVersion() : 99
-
-    addLog(`iOS: ${isIOS} | version: ${iosVersion} | permission: ${Notification.permission}`)
 
     if (isIOS && iosVersion < 16.4) {
       setIosUnsupported(true)
@@ -415,18 +383,13 @@ export default function ProfilPage() {
   }
 
   async function registerNativePush() {
-    addLog('Enregistrement SW natif…')
     const reg = await navigator.serviceWorker.register('/sw.js')
     await navigator.serviceWorker.ready
-    addLog('SW prêt ✓')
 
-    const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-    addLog('Abonnement PushManager…')
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly:      true,
-      applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!),
     })
-    addLog(`Endpoint: ${sub.endpoint.slice(0, 40)}…`)
 
     const subJson = sub.toJSON()
     const res = await fetch('/api/push/subscribe', {
@@ -436,17 +399,12 @@ export default function ProfilPage() {
     })
     const json = await res.json()
     if (!res.ok) throw new Error(json.error ?? 'Erreur sauvegarde subscription')
-    addLog('Subscription enregistrée ✓')
   }
 
   async function handleNotifRequest() {
     try {
-      const isIOS        = /iPad|iPhone|iPod/.test(navigator.userAgent)
-      const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-      addLog(`Activation — iOS: ${isIOS}, standalone: ${isStandalone}`)
-
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       const permission = await Notification.requestPermission()
-      addLog(`permission: ${permission}`)
 
       if (permission === 'granted') {
         if (isIOS) {
@@ -454,18 +412,10 @@ export default function ProfilPage() {
         } else {
           const OneSignal = (await import('react-onesignal')).default
           await OneSignal.User.PushSubscription.optIn()
-          const sub    = OneSignal.User.PushSubscription
-          const userId = OneSignal.User.onesignalId
-          addLog(`optedIn: ${sub.optedIn}`)
-          addLog(`id: ${sub.id ?? 'null'}`)
-          addLog(`token: ${sub.token ? sub.token.slice(0, 20) + '…' : 'null'}`)
-          addLog(`OneSignal User ID: ${userId ?? 'null'}`)
         }
         setNotifGranted(true)
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err)
-      addLog(`ERREUR: ${msg}`)
       console.error('[Notif] Erreur:', err)
     }
   }
@@ -805,15 +755,6 @@ export default function ProfilPage() {
           </div>
         )}
 
-        {/* Debug logs (temporairement toujours visible) */}
-        {debugLogs.length > 0 && (
-          <div className="rounded-xl p-3 space-y-0.5" style={{ backgroundColor: '#0F172A' }}>
-            <p className="text-[10px] font-bold text-white/40 mb-1">DEBUG NOTIFICATIONS</p>
-            {debugLogs.map((log, i) => (
-              <p key={i} className="text-[10px] font-mono text-green-400 leading-tight">{log}</p>
-            ))}
-          </div>
-        )}
 
         {/* Déconnexion */}
         <button
