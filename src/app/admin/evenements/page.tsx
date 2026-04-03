@@ -31,6 +31,8 @@ const EVENT_TYPES: Record<string, { label: string; color: string; bg: string }> 
 
 const TYPE_OPTIONS = Object.entries(EVENT_TYPES).map(([value, { label }]) => ({ value, label }))
 
+const VIDEO_MAX_BYTES = 50 * 1024 * 1024 // 50 MB
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
@@ -46,16 +48,15 @@ function toTimeInput(iso: string) { return iso.split('T')[1]?.slice(0, 5) ?? '' 
 // ── Formulaire ─────────────────────────────────────────────────────────────
 
 const DEFAULT_FORM = {
-  title:           '',
-  date:            '',
-  time:            '20:00',
-  ends_date:       '',
-  ends_time:       '',
-  location:        '',
-  type:            'soiree_bde',
-  description:     '',
-  price_cents:     '0',
-  video_url:       '',
+  title:       '',
+  date:        '',
+  time:        '20:00',
+  ends_date:   '',
+  ends_time:   '',
+  location:    '',
+  type:        'soiree_bde',
+  description: '',
+  price_cents: '0',
 }
 
 // ── Modal formulaire ───────────────────────────────────────────────────────
@@ -70,6 +71,7 @@ function EventFormModal({
   onSaved: () => void
 }) {
   const isEdit = !!event
+
   const [form,         setForm]         = useState(() =>
     event ? {
       title:       event.title,
@@ -81,36 +83,87 @@ function EventFormModal({
       type:        event.type        ?? 'soiree_bde',
       description: event.description ?? '',
       price_cents: String((event.price_cents ?? 0) / 100),
-      video_url:   event.video_url   ?? '',
     } : { ...DEFAULT_FORM }
   )
+
+  // Photo
   const [coverFile,    setCoverFile]    = useState<File | null>(null)
   const [coverPreview, setCoverPreview] = useState<string | null>(event?.cover_url ?? null)
+  const coverRef = useRef<HTMLInputElement>(null)
+
+  // Vidéo
+  const [videoFile,    setVideoFile]    = useState<File | null>(null)
+  const [videoName,    setVideoName]    = useState<string | null>(
+    event?.video_url ? event.video_url.split('/').pop() ?? null : null
+  )
+  const videoRef = useRef<HTMLInputElement>(null)
+
+  // Sondage
+  const [pollEnabled,  setPollEnabled]  = useState(false)
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions,  setPollOptions]  = useState(['', ''])
+
   const [saving,       setSaving]       = useState(false)
   const [error,        setError]        = useState<string | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
 
   function set(name: string, value: string) {
     setForm(p => ({ ...p, [name]: value }))
   }
 
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  // Photo
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
     setCoverFile(file)
     const reader = new FileReader()
     reader.onload = ev => setCoverPreview(ev.target?.result as string)
+    reader.onerror = () => setCoverPreview(null) // HEIC may not preview — that's OK
     reader.readAsDataURL(file)
   }
 
   async function uploadCover(file: File): Promise<string | null> {
-    const ext  = file.name.split('.').pop() ?? 'jpg'
+    const ext  = file.name.split('.').pop()?.toLowerCase() ?? 'jpg'
     const path = `covers/${Date.now()}.${ext}`
     const { data, error: upErr } = await supabase.storage
-      .from('event-covers')
+      .from('events')
       .upload(path, file, { upsert: true })
     if (upErr || !data) { console.warn('Cover upload:', upErr?.message); return null }
-    return supabase.storage.from('event-covers').getPublicUrl(data.path).data.publicUrl
+    return supabase.storage.from('events').getPublicUrl(data.path).data.publicUrl
+  }
+
+  // Vidéo
+  function handleVideoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > VIDEO_MAX_BYTES) {
+      setError('La vidéo dépasse la limite de 50 Mo.')
+      e.target.value = ''
+      return
+    }
+    setVideoFile(file)
+    setVideoName(file.name)
+  }
+
+  async function uploadVideo(file: File): Promise<string | null> {
+    const ext  = file.name.split('.').pop()?.toLowerCase() ?? 'mp4'
+    const path = `videos/${Date.now()}.${ext}`
+    const { data, error: upErr } = await supabase.storage
+      .from('events-videos')
+      .upload(path, file, { upsert: true })
+    if (upErr || !data) { console.warn('Video upload:', upErr?.message); return null }
+    return supabase.storage.from('events-videos').getPublicUrl(data.path).data.publicUrl
+  }
+
+  // Sondage options
+  function setPollOption(i: number, val: string) {
+    setPollOptions(opts => opts.map((o, idx) => idx === i ? val : o))
+  }
+  function addPollOption() {
+    if (pollOptions.length < 6) setPollOptions(o => [...o, ''])
+  }
+  function removePollOption(i: number) {
+    if (pollOptions.length <= 2) return
+    setPollOptions(o => o.filter((_, idx) => idx !== i))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -119,13 +172,27 @@ function EventFormModal({
       setError('Titre, date et heure sont obligatoires.')
       return
     }
+    if (pollEnabled) {
+      if (!pollQuestion.trim()) { setError('La question du sondage est obligatoire.'); return }
+      const validOpts = pollOptions.filter(o => o.trim())
+      if (validOpts.length < 2) { setError('Le sondage nécessite au moins 2 options.'); return }
+    }
+
     setSaving(true)
     setError(null)
 
+    // Upload photo
     let coverUrl = event?.cover_url ?? null
     if (coverFile) {
       const uploaded = await uploadCover(coverFile)
       if (uploaded) coverUrl = uploaded
+    }
+
+    // Upload vidéo
+    let videoUrl = event?.video_url ?? null
+    if (videoFile) {
+      const uploaded = await uploadVideo(videoFile)
+      if (uploaded) videoUrl = uploaded
     }
 
     const payload = {
@@ -137,15 +204,29 @@ function EventFormModal({
       description: form.description.trim() || null,
       price_cents: Math.round(parseFloat(form.price_cents || '0') * 100),
       cover_url:   coverUrl,
-      video_url:   form.video_url.trim() || null,
+      video_url:   videoUrl,
     }
 
     if (isEdit) {
       const { error: e } = await supabase.from('events').update(payload).eq('id', event!.id)
       if (e) { setError(e.message); setSaving(false); return }
     } else {
-      const { error: e } = await supabase.from('events').insert(payload)
-      if (e) { setError(e.message); setSaving(false); return }
+      const { data: newEvent, error: e } = await supabase
+        .from('events')
+        .insert(payload)
+        .select('id')
+        .single()
+      if (e || !newEvent) { setError(e?.message ?? 'Erreur création'); setSaving(false); return }
+
+      // Sondage
+      if (pollEnabled) {
+        const validOpts = pollOptions.filter(o => o.trim())
+        await supabase.from('sondages').insert({
+          event_id: newEvent.id,
+          question: pollQuestion.trim(),
+          options:  validOpts,
+        })
+      }
     }
 
     setSaving(false)
@@ -247,24 +328,120 @@ function EventFormModal({
             <label className={lbl}>Photo de couverture</label>
             {coverPreview && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverPreview} alt="Aperçu" className="w-full h-40 object-cover rounded-xl mb-2" />
+              <img src={coverPreview} alt="Aperçu" className="w-full h-40 object-cover rounded-xl mb-2"
+                onError={() => setCoverPreview(null)} />
             )}
-            <button type="button" onClick={() => fileRef.current?.click()}
+            <button type="button" onClick={() => coverRef.current?.click()}
               className="w-full h-11 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-400 flex items-center justify-center gap-2 transition hover:border-[#E8622A] hover:text-[#E8622A]">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
               </svg>
-              {coverPreview ? 'Changer la photo' : 'Choisir une photo'}
+              {coverFile ? coverFile.name : coverPreview ? 'Changer la photo' : 'Choisir une photo'}
             </button>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <input ref={coverRef} type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleCoverChange} />
           </div>
 
-          {/* URL vidéo YouTube */}
+          {/* Vidéo */}
           <div>
-            <label className={lbl}>Vidéo YouTube (URL, optionnel)</label>
-            <input type="url" value={form.video_url} onChange={e => set('video_url', e.target.value)}
-              placeholder="https://www.youtube.com/watch?v=..." className={inp} style={{ color: '#1D3550' }} />
+            <label className={lbl}>Vidéo (optionnel — max 50 Mo)</label>
+            <button type="button" onClick={() => videoRef.current?.click()}
+              className="w-full h-11 rounded-xl border-2 border-dashed border-gray-200 text-sm text-gray-400 flex items-center justify-center gap-2 transition hover:border-[#E8622A] hover:text-[#E8622A]">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+              </svg>
+              {videoName ? videoName : 'Choisir une vidéo'}
+            </button>
+            {videoName && (
+              <p className="text-xs text-gray-400 mt-1 truncate">{videoName}</p>
+            )}
+            <input ref={videoRef} type="file" accept="video/mp4,video/quicktime,video/webm,.mov"
+              className="hidden" onChange={handleVideoChange} />
           </div>
+
+          {/* Sondage */}
+          {!isEdit && (
+            <div className="rounded-2xl border border-gray-100 overflow-hidden">
+              {/* Toggle */}
+              <button
+                type="button"
+                onClick={() => setPollEnabled(p => !p)}
+                className="w-full flex items-center justify-between px-4 py-3"
+              >
+                <span className="text-sm font-semibold" style={{ color: '#1D3550' }}>
+                  Ajouter un sondage
+                </span>
+                <div
+                  className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
+                  style={{ backgroundColor: pollEnabled ? '#E8622A' : '#E5E7EB' }}
+                >
+                  <div
+                    className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                    style={{ transform: pollEnabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                  />
+                </div>
+              </button>
+
+              {pollEnabled && (
+                <div className="px-4 pb-4 space-y-3 border-t border-gray-100">
+                  <div className="pt-3">
+                    <label className={lbl}>Question *</label>
+                    <input
+                      type="text"
+                      value={pollQuestion}
+                      onChange={e => setPollQuestion(e.target.value)}
+                      placeholder="ex: Quel thème préféres-tu ?"
+                      className={inp}
+                      style={{ color: '#1D3550' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={lbl}>Options</label>
+                    <div className="space-y-2">
+                      {pollOptions.map((opt, i) => (
+                        <div key={i} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={e => setPollOption(i, e.target.value)}
+                            placeholder={`Option ${i + 1}`}
+                            className={`${inp} flex-1`}
+                            style={{ color: '#1D3550' }}
+                          />
+                          {pollOptions.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => removePollOption(i)}
+                              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: '#FEE2E2' }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth={2.5} className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {pollOptions.length < 6 && (
+                      <button
+                        type="button"
+                        onClick={addPollOption}
+                        className="mt-2 text-xs font-semibold flex items-center gap-1"
+                        style={{ color: '#E8622A' }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="w-3.5 h-3.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Ajouter une option
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <button type="submit" disabled={saving}
             className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
@@ -329,7 +506,7 @@ export default function EvenementsPage() {
   const [events,       setEvents]       = useState<Event[]>([])
   const [loading,      setLoading]      = useState(true)
   const [filter,       setFilter]       = useState<Filter>('all')
-  const [formEvent,    setFormEvent]    = useState<Event | null | 'new'>('new')
+  const [formEvent,    setFormEvent]    = useState<Event | null>(null)
   const [modalOpen,    setModalOpen]    = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Event | null>(null)
 
@@ -422,8 +599,8 @@ export default function EvenementsPage() {
           </div>
         ) : (
           filtered.map(ev => {
-            const type    = EVENT_TYPES[ev.type] ?? EVENT_TYPES.event_bde
-            const isPast  = ev.starts_at < now
+            const type   = EVENT_TYPES[ev.type] ?? EVENT_TYPES.event_bde
+            const isPast = ev.starts_at < now
             return (
               <div
                 key={ev.id}
@@ -433,7 +610,7 @@ export default function EvenementsPage() {
                 <div className="flex">
                   {/* Cover ou couleur */}
                   <div
-                    className="w-20 flex-shrink-0 flex items-center justify-center text-white text-xs font-bold"
+                    className="w-20 flex-shrink-0 flex items-center justify-center"
                     style={{
                       background: ev.cover_url
                         ? undefined
@@ -503,7 +680,7 @@ export default function EvenementsPage() {
       {/* Modal formulaire */}
       {modalOpen && (
         <EventFormModal
-          event={formEvent instanceof Object && formEvent !== null ? formEvent as Event : null}
+          event={formEvent}
           onClose={() => setModalOpen(false)}
           onSaved={fetchEvents}
         />
