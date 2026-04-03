@@ -1,6 +1,6 @@
 {
   "name": "BDE ECM Dijon",
-  "short_name": "BDE ECM",
+  "short_name": "BDE ECM Dijon",
   "description": "L'application officielle du BDE ECM Dijon",
   "start_url": "/accueil",
   "display": "standalone",
