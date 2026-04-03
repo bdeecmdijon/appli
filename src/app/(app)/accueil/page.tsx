@@ -329,8 +329,15 @@ export default function AccueilPage() {
         const OneSignal = (await import('react-onesignal')).default
         addLog('OneSignal.User.PushSubscription.optIn()…')
         await OneSignal.User.PushSubscription.optIn()
-        const optedIn = OneSignal.User.PushSubscription.optedIn
-        addLog(`optIn terminé — optedIn: ${optedIn}`)
+        const sub     = OneSignal.User.PushSubscription
+        const optedIn = sub.optedIn
+        const id      = sub.id    ?? '(vide)'
+        const token   = sub.token ?? '(vide)'
+        addLog(`optedIn: ${optedIn}`)
+        addLog(`Subscription ID: ${id}`)
+        addLog(`Token: ${token.slice(0, 40)}…`)
+        console.log('[OneSignal] Subscription ID:', sub.id)
+        console.log('[OneSignal] Subscription token:', sub.token)
         setNotificationsEnabled(true)
       }
     } catch (err) {
