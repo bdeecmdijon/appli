@@ -27,10 +27,10 @@ export default function LoginPage() {
         return
       }
 
-      // Succès — on redirige sans vérifier data.session
-      // (peut être null avec certaines configs Supabase mais le user est bien auth)
-      console.log('LOGIN SUCCESS, redirecting now...')
-      window.location.href = '/accueil'
+      console.log('LOGIN SUCCESS, redirect in 100ms...')
+      setTimeout(() => {
+        window.location.href = '/accueil'
+      }, 100)
     } catch (err) {
       setError('Une erreur est survenue. Réessaie.')
       setLoading(false)

@@ -425,11 +425,11 @@ export default function ProfilPage() {
   }
 
   async function handleSignOut() {
-    setLoggingOut(true)
-    console.log('[SignOut] début signOut')
     await supabase.auth.signOut()
-    console.log('[SignOut] cookies effacés — redirection')
-    window.location.replace('/auth/login')
+    console.log('SIGNOUT OK, redirect in 100ms...')
+    setTimeout(() => {
+      window.location.href = '/auth/login'
+    }, 100)
   }
 
   function handleSaved(updated: Partial<Profile>) {
