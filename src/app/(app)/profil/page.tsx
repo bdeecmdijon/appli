@@ -245,6 +245,18 @@ export default function ProfilPage() {
   const [notifGranted,    setNotifGranted]    = useState<boolean | null>(null)
   const [iosUnsupported,  setIosUnsupported]  = useState(false)
 
+  // Redirige vers login quand Supabase confirme la déconnexion
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      console.log('[Auth profil] event:', event)
+      if (event === 'SIGNED_OUT') {
+        console.log('[Auth profil] SIGNED_OUT → /auth/login')
+        window.location.href = '/auth/login'
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   useEffect(() => {
     async function fetchProfile() {
       try {
@@ -425,14 +437,10 @@ export default function ProfilPage() {
   }
 
   async function handleSignOut() {
+    setLoggingOut(true)
     await supabase.auth.signOut()
-    console.log('SIGNOUT OK, navigating to /auth/login')
-    const link = document.createElement('a')
-    link.href = '/auth/login'
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-    setTimeout(() => { window.location.assign('/auth/login') }, 500)
+    // onAuthStateChange SIGNED_OUT gère la redirection
+    console.log('[SignOut] signOut appelé — en attente de SIGNED_OUT')
   }
 
   function handleSaved(updated: Partial<Profile>) {

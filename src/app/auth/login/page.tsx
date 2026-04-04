@@ -1,48 +1,41 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 
-// Safari PWA : window.location.href peut être ignoré — on force via un <a> cliqué
-function safariNavigate(url: string) {
-  const link = document.createElement('a')
-  link.href = url
-  link.style.display = 'none'
-  document.body.appendChild(link)
-  link.click()
-  setTimeout(() => { window.location.assign(url) }, 500)
-}
-
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState('')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+
+  // Redirige quand Supabase confirme la session (cookies écrits)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] event:', event, '| session:', !!session)
+      if (event === 'SIGNED_IN' && session) {
+        console.log('[Auth] SIGNED_IN → /accueil')
+        window.location.href = '/accueil'
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
 
-      if (error) {
-        setError('Email ou mot de passe incorrect.')
-        setLoading(false)
-        return
-      }
-
-      console.log('LOGIN SUCCESS, navigating to /accueil')
-      safariNavigate('/accueil')
-    } catch (err) {
-      setError('Une erreur est survenue. Réessaie.')
+    if (error) {
+      console.error('[Login] erreur:', error.message)
+      setError('Email ou mot de passe incorrect.')
       setLoading(false)
     }
+    // Pas de redirection ici — onAuthStateChange s'en charge
   }
 
   return (
@@ -103,7 +96,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-13 mt-2 rounded-xl font-bold text-white text-base transition active:scale-[0.98] disabled:opacity-60"
+          className="w-full mt-2 rounded-xl font-bold text-white text-base transition active:scale-[0.98] disabled:opacity-60"
           style={{ backgroundColor: '#E8622A', height: '52px' }}
         >
           {loading ? (
@@ -127,11 +120,7 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-gray-500">
           Pas encore de compte ?{' '}
-          <Link
-            href="/auth/register"
-            className="font-semibold"
-            style={{ color: '#E8622A' }}
-          >
+          <Link href="/auth/register" className="font-semibold" style={{ color: '#E8622A' }}>
             S'inscrire
           </Link>
         </p>
