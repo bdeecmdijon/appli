@@ -19,7 +19,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
 
       if (error) {
         setError('Email ou mot de passe incorrect.')
@@ -27,9 +27,10 @@ export default function LoginPage() {
         return
       }
 
-      if (data.session) {
-        window.location.href = '/accueil'
-      }
+      // Succès — on redirige sans vérifier data.session
+      // (peut être null avec certaines configs Supabase mais le user est bien auth)
+      console.log('LOGIN SUCCESS, redirecting now...')
+      window.location.href = '/accueil'
     } catch (err) {
       setError('Une erreur est survenue. Réessaie.')
       setLoading(false)
