@@ -19,21 +19,18 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-      if (signInError) {
-        console.error('[Login] signInWithPassword error:', signInError.message)
+      if (error) {
         setError('Email ou mot de passe incorrect.')
         setLoading(false)
         return
       }
 
-      console.log('[Login] succès — redirection vers /accueil')
-      // window.location.replace garantit que les cookies sont écrits
-      // avant l'envoi de la requête HTTP (évite la boucle middleware)
-      window.location.replace('/accueil')
+      if (data.session) {
+        window.location.href = '/accueil'
+      }
     } catch (err) {
-      console.error('[Login] exception:', err)
       setError('Une erreur est survenue. Réessaie.')
       setLoading(false)
     }
