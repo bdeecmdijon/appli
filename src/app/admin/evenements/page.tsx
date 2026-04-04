@@ -3,21 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Cropper from 'react-easy-crop'
 import type { Area } from 'react-easy-crop'
+import { Link as LinkIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface Event {
-  id:          string
-  title:       string
-  starts_at:   string
-  ends_at:     string | null
-  location:    string | null
-  description: string | null
-  cover_url:   string | null
-  video_url:   string | null
-  type:        string
-  price_cents: number
+  id:                 string
+  title:              string
+  starts_at:          string
+  ends_at:            string | null
+  location:           string | null
+  description:        string | null
+  cover_url:          string | null
+  video_url:          string | null
+  type:               string
+  price_cents:        number
+  registration_url:   string | null
+  registration_label: string | null
 }
 
 type Filter = 'all' | 'upcoming' | 'past'
@@ -215,6 +218,11 @@ function EventFormModal({
   const [videoRemoved,  setVideoRemoved]  = useState(false)
   const videoRef = useRef<HTMLInputElement>(null)
 
+  // Lien externe
+  const [linkEnabled, setLinkEnabled] = useState(!!event?.registration_url)
+  const [linkUrl,     setLinkUrl]     = useState(event?.registration_url   ?? '')
+  const [linkLabel,   setLinkLabel]   = useState(event?.registration_label ?? '')
+
   // Sondage
   const [pollEnabled,  setPollEnabled]  = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
@@ -341,15 +349,17 @@ function EventFormModal({
     }
 
     const payload = {
-      title:       form.title.trim(),
-      starts_at:   `${form.date}T${form.time}:00`,
-      ends_at:     form.ends_date && form.ends_time ? `${form.ends_date}T${form.ends_time}:00` : null,
-      location:    form.location.trim()    || null,
-      type:        form.type,
-      description: form.description.trim() || null,
-      price_cents: Math.round(parseFloat(form.price_cents || '0') * 100),
-      cover_url:   coverUrl,
-      video_url:   videoUrl,
+      title:              form.title.trim(),
+      starts_at:          `${form.date}T${form.time}:00`,
+      ends_at:            form.ends_date && form.ends_time ? `${form.ends_date}T${form.ends_time}:00` : null,
+      location:           form.location.trim()    || null,
+      type:               form.type,
+      description:        form.description.trim() || null,
+      price_cents:        Math.round(parseFloat(form.price_cents || '0') * 100),
+      cover_url:          coverUrl,
+      video_url:          videoUrl,
+      registration_url:   linkEnabled && linkUrl.trim() ? linkUrl.trim() : null,
+      registration_label: linkEnabled && linkLabel.trim() ? linkLabel.trim() : null,
     }
 
     if (isEdit) {
@@ -608,6 +618,57 @@ function EventFormModal({
             />
           </div>
 
+          {/* Lien externe */}
+          <div className="rounded-2xl border border-gray-100 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setLinkEnabled(p => !p)}
+              className="w-full flex items-center justify-between px-4 py-3"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#1D3550' }}>
+                <LinkIcon size={15} strokeWidth={2.5} color="#E8622A" />
+                Ajouter un lien
+              </span>
+              <div
+                className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0"
+                style={{ backgroundColor: linkEnabled ? '#E8622A' : '#E5E7EB' }}
+              >
+                <div
+                  className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform"
+                  style={{ transform: linkEnabled ? 'translateX(22px)' : 'translateX(2px)' }}
+                />
+              </div>
+            </button>
+
+            {linkEnabled && (
+              <div className="px-4 pb-4 space-y-3 border-t border-gray-100 pt-3">
+                <div>
+                  <label className={lbl}>Texte du bouton</label>
+                  <input
+                    type="text"
+                    value={linkLabel}
+                    onChange={e => setLinkLabel(e.target.value)}
+                    placeholder="S'inscrire"
+                    maxLength={50}
+                    className={inp}
+                    style={{ color: '#1D3550' }}
+                  />
+                </div>
+                <div>
+                  <label className={lbl}>URL du lien *</label>
+                  <input
+                    type="url"
+                    value={linkUrl}
+                    onChange={e => setLinkUrl(e.target.value)}
+                    placeholder="https://..."
+                    className={inp}
+                    style={{ color: '#1D3550' }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sondage */}
           {!isEdit && (
             <div className="rounded-2xl border border-gray-100 overflow-hidden">
@@ -773,7 +834,7 @@ export default function EvenementsPage() {
     setLoading(true)
     const { data } = await supabase
       .from('events')
-      .select('id, title, starts_at, ends_at, location, description, cover_url, video_url, type, price_cents')
+      .select('id, title, starts_at, ends_at, location, description, cover_url, video_url, type, price_cents, registration_url, registration_label')
       .order('starts_at', { ascending: false })
     setEvents(data ?? [])
     setLoading(false)
