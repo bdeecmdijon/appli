@@ -176,7 +176,8 @@ export default function RegisterPage() {
       console.log('[Register] upsert succeeded')
     }
 
-    router.replace('/accueil')
+    console.log('[Register] succès — redirection vers /accueil')
+    window.location.replace('/accueil')
   }
 
   return (

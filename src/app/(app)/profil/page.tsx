@@ -426,8 +426,10 @@ export default function ProfilPage() {
 
   async function handleSignOut() {
     setLoggingOut(true)
+    console.log('[SignOut] début signOut')
     await supabase.auth.signOut()
-    router.replace('/auth/login')
+    console.log('[SignOut] cookies effacés — redirection')
+    window.location.replace('/auth/login')
   }
 
   function handleSaved(updated: Partial<Profile>) {
