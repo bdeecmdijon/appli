@@ -29,9 +29,7 @@ export default function LoginPage() {
       return
     }
 
-    // TODO: Réactiver la confirmation email avant la mise en production (désactivé car localhost)
-    router.refresh()
-    router.push('/accueil')
+    router.replace('/accueil')
   }
 
   return (

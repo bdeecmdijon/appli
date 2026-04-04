@@ -5,7 +5,7 @@ import type { NextRequest } from 'next/server'
 const PROTECTED = ['/accueil', '/bds', '/jeu', '/partenaires', '/profil']
 const AUTH_PAGES = ['/auth/login', '/auth/register']
 
-export async function proxy(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   let res = NextResponse.next({ request: req })
 
   const supabase = createServerClient(

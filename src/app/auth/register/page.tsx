@@ -128,15 +128,16 @@ export default function RegisterPage() {
       })
     }
 
-    // 3. Sauvegarder le profil complet (sans total_points géré côté DB)
+    // 3. Sauvegarder le profil complet
     const profilePayload = {
-      id:          userId,
-      email:       form.email,
-      full_name:   fullName,
-      phone:       phoneClean       || null,
-      ecole:       form.ecole       || null,
-      formation:   form.formation   || null,
-      autre_ecole: form.autre_ecole || null,
+      id:             userId,
+      email:          form.email,
+      full_name:      fullName,
+      phone:          phoneClean       || null,
+      ecole:          form.ecole       || null,
+      formation:      form.formation   || null,
+      autre_ecole:    form.autre_ecole || null,
+      points_balance: 10,   // cadeau de bienvenue
     }
 
     console.log('[Register] saving profile →', profilePayload)
@@ -175,9 +176,7 @@ export default function RegisterPage() {
       console.log('[Register] upsert succeeded')
     }
 
-    // TODO: Réactiver la confirmation email avant la mise en production
-    router.refresh()
-    router.push('/accueil')
+    router.replace('/accueil')
   }
 
   return (

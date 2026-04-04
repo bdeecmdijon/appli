@@ -6,6 +6,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import CalendarSection from '@/components/CalendarSection'
 import RedemptionFlow, { type Reward } from '@/components/RedemptionFlow'
+import AnimatedCounter from '@/components/AnimatedCounter'
+import OwlMascot from '@/components/OwlMascot'
+import PartyModeBanner from '@/components/PartyMode'
+import StarfieldBackground from '@/components/StarfieldBackground'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -135,6 +139,7 @@ function RewardsSheet({
         onClose={() => { setActiveReward(null); onClose() }}
         onSuccess={(newBalance) => {
           onPointsUpdated(newBalance)
+          import('@/lib/celebrate').then(m => m.confettiPop())
         }}
       />
     )
@@ -221,6 +226,7 @@ export default function AccueilPage() {
   const [tierUpName,           setTierUpName]           = useState<string | null>(null)
   const [notificationsEnabled, setNotificationsEnabled] = useState(true) // true par défaut pour éviter le flash
   const [iosUnsupported,       setIosUnsupported]       = useState(false)
+  const [partyMode,            setPartyMode]            = useState(false)
 
   // Ref pour détecter le changement de palier sans déclencher au premier chargement
   const prevTierRef   = useRef<number | null>(null)
@@ -405,11 +411,14 @@ export default function AccueilPage() {
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#E8622A' }}>BDE ECM Dijon</p>
-          <h1 className="text-2xl font-extrabold mt-0.5" style={{ color: '#1D3550' }}>
-            Bonjour{firstName ? ` ${firstName}` : ''} 👋
-          </h1>
+        <div className="flex items-center gap-3">
+          <OwlMascot partyMode={partyMode} />
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest" style={{ color: '#E8622A' }}>BDE ECM Dijon</p>
+            <h1 className="text-2xl font-extrabold mt-0.5" style={{ color: '#1D3550' }}>
+              Bonjour{firstName ? ` ${firstName}` : ''} 👋
+            </h1>
+          </div>
         </div>
         <div className="w-12 h-12 rounded-2xl overflow-hidden flex items-center justify-center"
           style={{ background: 'linear-gradient(135deg, #1D3550, #2E5A8A)', boxShadow: '0 4px 12px rgba(29,53,80,0.25)' }}>
@@ -424,6 +433,9 @@ export default function AccueilPage() {
       )}
 
       <div className="px-5 space-y-5 pb-6">
+
+        {/* ── Bannière Party Mode ── */}
+        <PartyModeBanner onPartyDetected={setPartyMode} />
 
         {/* ── Bannière notifications ── */}
         {iosUnsupported && (
@@ -459,13 +471,17 @@ export default function AccueilPage() {
             boxShadow:   '0 8px 32px rgba(13,27,60,0.35)',
           }}
         >
+          {/* Starfield background */}
+          <StarfieldBackground count={40} color="#E8622A" opacity={0.22} />
+
           {/* Orbe décoratif */}
           <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full opacity-10"
             style={{ background: 'radial-gradient(circle, #E8622A, transparent)' }} />
 
-          <p className="text-xs text-white/50 font-semibold uppercase tracking-widest mb-1">Mes points</p>
-          <div className="flex items-end gap-2 mb-4">
-            <span
+          <p className="text-xs text-white/50 font-semibold uppercase tracking-widest mb-1 relative z-10">Mes points</p>
+          <div className="flex items-end gap-2 mb-4 relative z-10">
+            <AnimatedCounter
+              value={points}
               className="text-5xl font-extrabold tracking-tight leading-none"
               style={{
                 background:             'linear-gradient(135deg, #FF8C42 0%, #E8622A 100%)',
@@ -473,15 +489,13 @@ export default function AccueilPage() {
                 WebkitTextFillColor:    'transparent',
                 backgroundClip:         'text',
               }}
-            >
-              {points.toLocaleString('fr-FR')}
-            </span>
+            />
             <span className="text-base font-semibold text-white/60 mb-1">pts</span>
           </div>
 
           <button
             onClick={() => setSheetOpen(true)}
-            className="w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] mb-4 flex items-center justify-center gap-1.5"
+            className="w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] mb-4 flex items-center justify-center gap-1.5 relative z-10"
             style={{
               background:  'linear-gradient(135deg, #E8622A, #FF6B35)',
               boxShadow:   '0 4px 16px rgba(232,98,42,0.4)',
@@ -495,7 +509,7 @@ export default function AccueilPage() {
           </button>
 
           {/* Barre Bronze / Argent / Or */}
-          <div>
+          <div className="relative z-10">
             <div className="flex justify-between mb-1.5">
               {TIERS.map((tier, i) => (
                 <span
@@ -729,6 +743,7 @@ export default function AccueilPage() {
           onSuccess={(newBalance) => {
             setProfile(prev => prev ? { ...prev, points_balance: newBalance } : prev)
             setActiveReward(null)
+            import('@/lib/celebrate').then(m => m.confettiPop())
           }}
         />
       )}

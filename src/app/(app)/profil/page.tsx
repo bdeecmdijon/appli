@@ -27,6 +27,7 @@ interface Profile {
   points_balance: number
   student_code:   string | null
   role:           string | null
+  current_streak: number
 }
 
 const MOCK_STATS = { events_count: 3, games_count: 2 }
@@ -260,6 +261,7 @@ export default function ProfilPage() {
             points_balance: 620,
             student_code:   'ECM-DEMO01',
             role:           null,
+            current_streak: 0,
           })
           setLoading(false)
           return
@@ -270,7 +272,7 @@ export default function ProfilPage() {
         // Requête principale — toutes les colonnes nécessaires
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, phone, formation, ecole, autre_ecole, points_balance, student_code, role')
+          .select('full_name, phone, formation, ecole, autre_ecole, points_balance, student_code, role, current_streak')
           .eq('id', user.id)
           .single()
 
@@ -286,6 +288,7 @@ export default function ProfilPage() {
           points_balance: profileData?.points_balance ?? 0,
           student_code:   profileData?.student_code   ?? null,
           role:           profileData?.role           ?? null,
+          current_streak: profileData?.current_streak ?? 0,
         }
 
         setProfile(built)
@@ -349,6 +352,7 @@ export default function ProfilPage() {
           points_balance: 620,
           student_code:   'ECM-DEMO01',
           role:           null,
+          current_streak: 0,
         })
       } finally {
         setLoading(false)
@@ -423,7 +427,7 @@ export default function ProfilPage() {
   async function handleSignOut() {
     setLoggingOut(true)
     await supabase.auth.signOut()
-    router.push('/auth/login')
+    router.replace('/auth/login')
   }
 
   function handleSaved(updated: Partial<Profile>) {
@@ -552,13 +556,21 @@ export default function ProfilPage() {
             </span>
             <span className="text-base font-medium text-gray-400 mb-1">points</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <div
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white"
               style={{ backgroundColor: tier.color }}
             >
               Palier {tier.name}
             </div>
+            {(profile?.current_streak ?? 0) > 1 && (
+              <div
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-white"
+                style={{ background: 'linear-gradient(135deg, #E8622A, #FF6B35)' }}
+              >
+                🔥 {profile!.current_streak} soirées d&apos;affilée !
+              </div>
+            )}
             {nextTier && (
               <span className="text-xs text-gray-400">
                 · {nextTier.min - (profile?.points_balance ?? 0)} pts avant {nextTier.name}
