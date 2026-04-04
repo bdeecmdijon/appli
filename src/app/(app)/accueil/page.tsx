@@ -636,7 +636,9 @@ export default function AccueilPage() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-bold" style={{ color: '#1D3550' }}>Événements à venir</h2>
-            <button className="text-sm font-medium" style={{ color: '#E8622A' }}>Voir tout</button>
+            <Link href="/evenements" className="text-sm font-medium" style={{ color: '#E8622A' }}>
+              Voir tout
+            </Link>
           </div>
 
           {events.length === 0 ? (
