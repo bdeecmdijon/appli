@@ -426,10 +426,13 @@ export default function ProfilPage() {
 
   async function handleSignOut() {
     await supabase.auth.signOut()
-    console.log('SIGNOUT OK, redirect in 100ms...')
-    setTimeout(() => {
-      window.location.href = '/auth/login'
-    }, 100)
+    console.log('SIGNOUT OK, navigating to /auth/login')
+    const link = document.createElement('a')
+    link.href = '/auth/login'
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    setTimeout(() => { window.location.assign('/auth/login') }, 500)
   }
 
   function handleSaved(updated: Partial<Profile>) {

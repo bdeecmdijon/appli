@@ -6,6 +6,16 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { supabase } from '@/lib/supabase'
 
+// Safari PWA : window.location.href peut être ignoré — on force via un <a> cliqué
+function safariNavigate(url: string) {
+  const link = document.createElement('a')
+  link.href = url
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  setTimeout(() => { window.location.assign(url) }, 500)
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
@@ -27,10 +37,8 @@ export default function LoginPage() {
         return
       }
 
-      console.log('LOGIN SUCCESS, redirect in 100ms...')
-      setTimeout(() => {
-        window.location.href = '/accueil'
-      }, 100)
+      console.log('LOGIN SUCCESS, navigating to /accueil')
+      safariNavigate('/accueil')
     } catch (err) {
       setError('Une erreur est survenue. Réessaie.')
       setLoading(false)
