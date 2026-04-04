@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { ExternalLink } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 // ── Composant Sondage ─────────────────────────────────────────────────────
@@ -148,6 +149,8 @@ interface Event {
   cover_url: string | null
   video_url: string | null
   price_cents: number
+  registration_url: string | null
+  registration_label: string | null
 }
 
 // ── Mock fallback ──────────────────────────────────────────────────────────
@@ -156,6 +159,8 @@ const MOCK_EVENTS: Record<string, Event> = {
   '1': {
     id: '1',
     video_url: null,
+    registration_url: null,
+    registration_label: null,
     title: 'Soirée de rentrée BDE',
     starts_at: '2026-04-12T21:00:00',
     ends_at: '2026-04-13T02:00:00',
@@ -167,6 +172,8 @@ const MOCK_EVENTS: Record<string, Event> = {
   '2': {
     id: '2',
     video_url: null,
+    registration_url: null,
+    registration_label: null,
     title: 'Tournoi de foot inter-promos',
     starts_at: '2026-04-18T14:00:00',
     ends_at: '2026-04-18T18:00:00',
@@ -178,6 +185,8 @@ const MOCK_EVENTS: Record<string, Event> = {
   '3': {
     id: '3',
     video_url: null,
+    registration_url: null,
+    registration_label: null,
     title: 'Conférence Entrepreneuriat',
     starts_at: '2026-04-25T18:30:00',
     ends_at: '2026-04-25T20:30:00',
@@ -270,7 +279,7 @@ export default function EventDetailPage() {
       try {
         const { data, error } = await supabase
           .from('events')
-          .select('id, title, starts_at, ends_at, location, description, cover_url, video_url, price_cents')
+          .select('id, title, starts_at, ends_at, location, description, cover_url, video_url, price_cents, registration_url, registration_label')
           .eq('id', id)
           .single()
 
@@ -467,6 +476,24 @@ export default function EventDetailPage() {
 
         {/* Sondage */}
         <PollSection eventId={event.id} />
+
+        {/* Bouton d'inscription externe */}
+        {event.registration_url && (
+          <a
+            href={event.registration_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full h-14 rounded-2xl font-bold text-white flex items-center justify-center gap-2.5 transition active:scale-[0.98]"
+            style={{
+              background:  'linear-gradient(135deg, #E8622A, #FF6B35)',
+              boxShadow:   '0 4px 20px rgba(232,98,42,0.4)',
+              fontSize:    '15px',
+            }}
+          >
+            <ExternalLink size={18} strokeWidth={2.5} />
+            {event.registration_label || "S'inscrire"}
+          </a>
+        )}
 
         {/* Actions : calendrier + partager */}
         <div className="grid grid-cols-2 gap-3">
