@@ -36,12 +36,11 @@ const ZONE_RING: Record<string, { mid: number; color: string }> = {
 }
 
 const PRIZES_PREVIEW = [
-  { zone: 'jackpot', emoji: '🟡', label: 'Jackpot',   prize: 'Sandwich + boisson offerts',  prob: '2%'  },
-  { zone: 'gros',    emoji: '🟣', label: 'Gros lot',  prize: '1 pinte offerte',             prob: '8%'  },
-  { zone: 'super',   emoji: '🟢', label: 'Super lot', prize: '1 bière 25cl offerte',        prob: '5%'  },
-  { zone: 'bon',     emoji: '🔵', label: 'Bon lot',   prize: '1 soda offert',               prob: '10%' },
-  { zone: 'petit',   emoji: '🟠', label: 'Petit lot', prize: '-1€ sur ta commande',         prob: '25%' },
-  { zone: 'perdu',   emoji: '🔴', label: 'Raté',      prize: 'Retente au prochain achat',   prob: '50%' },
+  { zone: 'jackpot', emoji: '🟡', prize: 'Sandwich + boisson offerts' },
+  { zone: 'gros',    emoji: '🟣', prize: '1 pinte offerte'            },
+  { zone: 'super',   emoji: '🟢', prize: '1 bière 25cl offerte'       },
+  { zone: 'bon',     emoji: '🔵', prize: '1 soda offert'              },
+  { zone: 'petit',   emoji: '🟠', prize: '-1€ sur ta prochaine commande' },
 ]
 
 // ── SVG : Cible de pétanque ───────────────────────────────────────────────
@@ -200,25 +199,21 @@ function HubView({
                           className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0"
                           style={{ backgroundColor: '#1D355010' }}
                         >
-                          🎳
+                          🎱
                         </div>
                         <div className="flex-1 min-w-0">
                           <h3 className="text-base font-extrabold" style={{ color: '#1D3550' }}>
-                            {game.name}
+                            🎱 {game.name}
                           </h3>
                           {game.event_name && (
-                            <span
-                              className="inline-block text-xs font-semibold px-2 py-0.5 rounded-full text-white mt-1"
-                              style={{ backgroundColor: '#E8622A' }}
-                            >
+                            <p className="text-xs font-semibold mt-0.5" style={{ color: '#E8622A' }}>
                               📍 {game.event_name}
-                            </span>
-                          )}
-                          {game.description && (
-                            <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">
-                              {game.description}
                             </p>
                           )}
+                          <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+                            Tous les 5€ d&apos;achat à la buvette = 1 crédit pour jouer !<br />
+                            Tente ta chance et gagne des lots 🎁
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -250,7 +245,28 @@ function HubView({
           )}
         </section>
 
-        {/* Aperçu des lots */}
+        {/* Comment jouer */}
+        <section>
+          <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Comment jouer ?</h2>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {[
+              { icon: '🛒', text: 'Dépense 5€ à la buvette' },
+              { icon: '📱', text: 'Montre ton QR code' },
+              { icon: '🎮', text: 'Reçois 1 crédit de jeu' },
+              { icon: '🎱', text: 'Lance et gagne !' },
+            ].map((step, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-4 px-4 py-3.5 border-b border-gray-50 last:border-0"
+              >
+                <span className="text-2xl flex-shrink-0">{step.icon}</span>
+                <p className="text-sm font-semibold" style={{ color: '#1D3550' }}>{step.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Lots à gagner */}
         <section>
           <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Lots à gagner 🏆</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -260,13 +276,7 @@ function HubView({
                 className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0"
               >
                 <span className="text-xl flex-shrink-0">{item.emoji}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: '#1D3550' }}>
-                    {item.label}
-                  </p>
-                  <p className="text-xs text-gray-400 truncate">{item.prize}</p>
-                </div>
-                <span className="text-xs font-bold text-gray-300 flex-shrink-0">{item.prob}</span>
+                <p className="text-sm font-semibold" style={{ color: '#1D3550' }}>{item.prize}</p>
               </div>
             ))}
           </div>
