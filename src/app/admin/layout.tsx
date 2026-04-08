@@ -210,18 +210,25 @@ function ScannerModal({ onClose }: { onClose: () => void }) {
   async function handleGiveCredits() {
     if (!student || !selectedGameId || creditsToGive < 1) return
     setGivingCredits(true)
+    const payload = { userId: student.id, gameId: selectedGameId, credits: creditsToGive }
+    console.log('[handleGiveCredits] envoi:', payload)
     try {
       const res  = await fetch('/api/admin/give-credits', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ userId: student.id, gameId: selectedGameId, credits: creditsToGive }),
+        body:    JSON.stringify(payload),
       })
       const data = await res.json()
+      console.log('[handleGiveCredits] réponse HTTP', res.status, data)
       if (data.success) {
         setCurrentCredits(data.credits)
         setCreditSuccess(true)
         setTimeout(() => setCreditSuccess(false), 2500)
+      } else {
+        console.error('[handleGiveCredits] erreur API:', data.error, data.detail)
       }
+    } catch (err) {
+      console.error('[handleGiveCredits] exception réseau:', err)
     } finally {
       setGivingCredits(false)
     }
