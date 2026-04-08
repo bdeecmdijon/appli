@@ -129,6 +129,14 @@ function ScannerModal({ onClose }: { onClose: () => void }) {
   const [lastCode,  setLastCode]  = useState('')
   const cooldownRef = useRef(false)
 
+  // ── Crédits Jeu ──────────────────────────────────────────────────────────
+  const [gamesList,      setGamesList]      = useState<{ id: string; name: string }[]>([])
+  const [selectedGameId, setSelectedGameId] = useState('')
+  const [currentCredits, setCurrentCredits] = useState<number | null>(null)
+  const [creditsToGive,  setCreditsToGive]  = useState(1)
+  const [givingCredits,  setGivingCredits]  = useState(false)
+  const [creditSuccess,  setCreditSuccess]  = useState(false)
+
   const effectiveAmount = customAmt !== '' ? Number(customAmt) : amount
 
   async function handleScan(code: string) {
@@ -164,6 +172,59 @@ function ScannerModal({ onClose }: { onClose: () => void }) {
     setSuccess(false)
     setLastCode('')
     cooldownRef.current = false
+    setGamesList([])
+    setSelectedGameId('')
+    setCurrentCredits(null)
+    setCreditsToGive(1)
+    setGivingCredits(false)
+    setCreditSuccess(false)
+  }
+
+  // Charge les jeux actifs quand un étudiant est trouvé
+  useEffect(() => {
+    if (step !== 'found' || !student) return
+    supabase
+      .from('games')
+      .select('id, name')
+      .eq('is_active', true)
+      .not('name', 'is', null)
+      .then(({ data }) => {
+        const list = data ?? []
+        setGamesList(list)
+        if (list.length > 0) setSelectedGameId(list[0].id)
+      })
+  }, [step, student])
+
+  // Charge les crédits actuels quand le jeu sélectionné change
+  useEffect(() => {
+    if (!student || !selectedGameId) return
+    supabase
+      .from('game_credits')
+      .select('credits')
+      .eq('user_id', student.id)
+      .eq('game_id', selectedGameId)
+      .maybeSingle()
+      .then(({ data }) => setCurrentCredits(data?.credits ?? 0))
+  }, [student, selectedGameId])
+
+  async function handleGiveCredits() {
+    if (!student || !selectedGameId || creditsToGive < 1) return
+    setGivingCredits(true)
+    try {
+      const res  = await fetch('/api/admin/give-credits', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId: student.id, gameId: selectedGameId, credits: creditsToGive }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setCurrentCredits(data.credits)
+        setCreditSuccess(true)
+        setTimeout(() => setCreditSuccess(false), 2500)
+      }
+    } finally {
+      setGivingCredits(false)
+    }
   }
 
   async function handleAttribuer() {
@@ -308,6 +369,66 @@ function ScannerModal({ onClose }: { onClose: () => void }) {
                 {saving ? 'Enregistrement…' : 'Attribuer les points'}
               </button>
             </div>
+
+            {/* ── Crédits Jeu ── */}
+            {gamesList.length > 0 && (
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">🎮 Crédits Jeu</p>
+
+                {/* Sélection du jeu */}
+                <select
+                  value={selectedGameId}
+                  onChange={e => setSelectedGameId(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm bg-white outline-none focus:border-[#7C3AED] mb-2.5 transition"
+                  style={{ color: '#1D3550' }}
+                >
+                  {gamesList.map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
+
+                {/* Crédits actuels */}
+                {currentCredits !== null && (
+                  <p className="text-xs text-gray-400 mb-3">
+                    Crédits actuels :{' '}
+                    <span className="font-bold" style={{ color: '#7C3AED' }}>
+                      {currentCredits}
+                    </span>
+                  </p>
+                )}
+
+                {/* Sélection quantité */}
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {[1, 2, 3].map(v => (
+                    <button
+                      key={v}
+                      onClick={() => setCreditsToGive(v)}
+                      className="h-11 rounded-xl text-sm font-bold border-2 transition active:scale-[0.97]"
+                      style={{
+                        borderColor:     creditsToGive === v ? '#7C3AED' : '#E5E7EB',
+                        backgroundColor: creditsToGive === v ? '#7C3AED12' : 'white',
+                        color:           '#1D3550',
+                      }}
+                    >
+                      {v}
+                    </button>
+                  ))}
+                </div>
+
+                <button
+                  onClick={handleGiveCredits}
+                  disabled={givingCredits || creditsToGive < 1}
+                  className="w-full h-12 rounded-2xl font-bold text-white transition active:scale-[0.98] disabled:opacity-50"
+                  style={{ backgroundColor: creditSuccess ? '#16A34A' : '#7C3AED' }}
+                >
+                  {creditSuccess
+                    ? `✅ +${creditsToGive} crédit${creditsToGive > 1 ? 's' : ''} attribué${creditsToGive > 1 ? 's' : ''} !`
+                    : givingCredits
+                      ? 'Enregistrement…'
+                      : `Donner ${creditsToGive} crédit${creditsToGive > 1 ? 's' : ''}`}
+                </button>
+              </div>
+            )}
 
             <button onClick={resetScanner} className="w-full h-11 rounded-2xl font-semibold text-sm border border-gray-200 bg-white" style={{ color: '#1D3550' }}>
               ← Scanner un autre étudiant

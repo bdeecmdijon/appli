@@ -73,7 +73,7 @@ function groupClassements(rows: ClassementRow[]): ClassementGroup[] {
   return Array.from(map.values())
 }
 
-function isEcm(equipe: string) { return equipe.toLowerCase().includes('ecm') }
+function isEcm(equipe: string) { return equipe.toLowerCase().includes('dijon') }
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('fr-FR', {

@@ -26,8 +26,8 @@ const navItems = [
     ),
   },
   {
-    href:  '/jeu',
-    label: 'Jeu',
+    href:  '/jeux',
+    label: 'Jeux',
     icon:  (active: boolean) => (
       <Gamepad2 size={26} strokeWidth={2} color={active ? ACTIVE_COLOR : INACTIVE_COLOR} fill="none" />
     ),
@@ -88,7 +88,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
 
       <main className="flex-1 pb-28 overflow-y-auto">
-        {children}
+        <div key={pathname} className="animate-page-in">
+          {children}
+        </div>
       </main>
 
       <nav
