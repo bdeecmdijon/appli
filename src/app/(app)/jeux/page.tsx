@@ -14,26 +14,17 @@ interface Game {
 }
 
 interface PlayResult {
-  result:          string
-  prizeName:       string
-  emoji:           string
-  color:           string
-  generatesCoupon: boolean
-  couponId:        string | null
+  result:           string
+  prizeName:        string
+  emoji:            string
+  color:            string
+  generatesCoupon:  boolean
+  couponId:         string | null
   creditsRemaining: number
-  error?:          string
+  error?:           string
 }
 
-// ── Zone config (matching DB) ─────────────────────────────────────────────
-
-const ZONE_RING: Record<string, { mid: number; color: string }> = {
-  perdu:   { mid: 110, color: '#ef4444' },
-  petit:   { mid:  90, color: '#f97316' },
-  bon:     { mid:  70, color: '#3b82f6' },
-  super:   { mid:  50, color: '#22c55e' },
-  gros:    { mid:  30, color: '#a855f7' },
-  jackpot: { mid:  10, color: '#eab308' },
-}
+// ── Prizes preview ────────────────────────────────────────────────────────
 
 const PRIZES_PREVIEW = [
   { zone: 'jackpot', emoji: '🟡', prize: 'Sandwich + boisson offerts' },
@@ -43,89 +34,76 @@ const PRIZES_PREVIEW = [
   { zone: 'petit',   emoji: '🟠', prize: '-1€ sur ta prochaine commande' },
 ]
 
-// ── SVG : Cible de pétanque ───────────────────────────────────────────────
+// ── Final ball position per result (% of scene container) ─────────────────
 
-function Target({ result }: { result?: string }) {
-  const ring = result ? ZONE_RING[result] : null
-  return (
-    <svg width={252} height={252} viewBox="-126 -126 252 252">
-      <defs>
-        <filter id="tg-shadow">
-          <feDropShadow dx="3" dy="4" stdDeviation="6" floodOpacity="0.3" />
-        </filter>
-        <filter id="tg-glow">
-          <feGaussianBlur stdDeviation="5" result="blur" />
-          <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      {/* Shadow */}
-      <circle r={121} fill="rgba(0,0,0,0.2)" transform="translate(3,4)" />
-      {/* Zones (outside → inside) */}
-      <circle r={120} fill="#ef4444" />
-      <circle r={100} fill="#f97316" />
-      <circle r={80}  fill="#3b82f6" />
-      <circle r={60}  fill="#22c55e" />
-      <circle r={40}  fill="#a855f7" />
-      <circle r={20}  fill="#eab308" />
-      {/* Séparateurs blancs */}
-      {[100, 80, 60, 40, 20].map(r => (
-        <circle key={r} r={r} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
-      ))}
-      {/* Bord extérieur */}
-      <circle r={120} fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth={2} />
-      {/* Cochonnet */}
-      <circle r={11} fill="white" stroke="#ca8a04" strokeWidth={2.5} filter="url(#tg-shadow)" />
-      <circle r={5.5} fill="#fbbf24" />
-      {/* Anneau gagnant */}
-      {ring && (
-        <circle
-          r={ring.mid}
-          fill="none"
-          stroke="white"
-          strokeWidth={7}
-          strokeOpacity={0.95}
-          filter="url(#tg-glow)"
-        />
-      )}
-    </svg>
-  )
+const RESULT_POS: Record<string, { x: number; y: number; s: number }> = {
+  jackpot: { x: 50,   y: 38,   s: 0.50 },
+  gros:    { x: 47.5, y: 41,   s: 0.52 },
+  super:   { x: 53,   y: 44.5, s: 0.55 },
+  bon:     { x: 44,   y: 49,   s: 0.58 },
+  petit:   { x: 57,   y: 54,   s: 0.62 },
+  perdu:   { x: 63,   y: 62,   s: 0.68 },
 }
 
-// ── SVG : Boule de pétanque ───────────────────────────────────────────────
+// ── SVG: Metallic pétanque ball ───────────────────────────────────────────
 
-function PetanqueBall({ size = 64 }: { size?: number }) {
-  const r = size / 2 - 3
-  const cx = 0
-  const cy = 0
+function MetallicBall({ size = 72 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox={`${-size/2} ${-size/2} ${size} ${size}`}>
+    <svg width={size} height={size} viewBox="0 0 100 100" style={{ display: 'block', overflow: 'visible' }}>
       <defs>
-        <radialGradient id="ball-g" cx="37%" cy="30%" r="65%">
-          <stop offset="0%"   stopColor="#b8c4d4" />
-          <stop offset="55%"  stopColor="#5a6880" />
-          <stop offset="100%" stopColor="#1e2a3a" />
+        <radialGradient id="mb-g" cx="38%" cy="30%" r="68%">
+          <stop offset="0%"   stopColor="#d6e0ed" />
+          <stop offset="40%"  stopColor="#8090ac" />
+          <stop offset="75%"  stopColor="#3f4f66" />
+          <stop offset="100%" stopColor="#151e2d" />
         </radialGradient>
-        <filter id="ball-shadow">
-          <feDropShadow dx="2" dy="3" stdDeviation="4" floodOpacity="0.5" />
+        <radialGradient id="mb-env" cx="62%" cy="72%" r="55%">
+          <stop offset="0%"   stopColor="#6a9abf" stopOpacity="0.28" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+        <filter id="mb-sh" x="-25%" y="-25%" width="150%" height="150%">
+          <feDropShadow dx="2" dy="5" stdDeviation="6" floodColor="#000" floodOpacity="0.55" />
         </filter>
       </defs>
-      <circle cx={cx} cy={cy} r={r} fill="url(#ball-g)" filter="url(#ball-shadow)" />
-      {/* Rainures */}
-      <path
-        d={`M${-r*0.68},${r*0.08} Q${cx},${r*0.52} ${r*0.68},${r*0.08}`}
-        stroke="rgba(0,0,0,0.22)" strokeWidth={1.5} fill="none"
-      />
-      <path
-        d={`M${-r*0.6},${-r*0.18} Q${-r*0.1},${-r*0.62} ${r*0.58},${-r*0.18}`}
-        stroke="rgba(0,0,0,0.15)" strokeWidth={1} fill="none"
-      />
-      {/* Reflet */}
-      <ellipse cx={cx - r*0.28} cy={cy - r*0.28} rx={r*0.22} ry={r*0.16} fill="rgba(255,255,255,0.22)" transform={`rotate(-35,${cx - r*0.28},${cy - r*0.28})`} />
+      <circle cx="50" cy="50" r="46" fill="url(#mb-g)" filter="url(#mb-sh)" />
+      <circle cx="50" cy="50" r="46" fill="url(#mb-env)" />
+      <path d="M16 58 Q50 74 84 58" stroke="rgba(0,0,0,0.22)" strokeWidth="3" fill="none" strokeLinecap="round" />
+      <path d="M20 37 Q50 22 80 37" stroke="rgba(0,0,0,0.15)" strokeWidth="2" fill="none" strokeLinecap="round" />
+      <ellipse cx="34" cy="33" rx="13" ry="9" fill="rgba(255,255,255,0.38)" transform="rotate(-30 34 33)" />
+      <ellipse cx="63" cy="65" rx="7" ry="4.5" fill="rgba(255,255,255,0.13)" transform="rotate(-30 63 65)" />
     </svg>
   )
 }
 
-// ── Vue Hub ───────────────────────────────────────────────────────────────
+// ── SVG: Cochonnet ────────────────────────────────────────────────────────
+
+function Cochonnet({ glow = false }: { glow?: boolean }) {
+  return (
+    <svg
+      width={24} height={24} viewBox="0 0 40 40"
+      style={{
+        display: 'block',
+        filter: glow ? 'drop-shadow(0 0 8px #FFD700) drop-shadow(0 0 16px #FFD700)' : 'none',
+        transition: 'filter 0.4s ease',
+      }}
+    >
+      <defs>
+        <radialGradient id="cg" cx="38%" cy="30%" r="65%">
+          <stop offset="0%"   stopColor="#FFF176" />
+          <stop offset="55%"  stopColor="#F5A623" />
+          <stop offset="100%" stopColor="#C47B00" />
+        </radialGradient>
+        <filter id="csh">
+          <feDropShadow dx="1" dy="2" stdDeviation="2" floodOpacity="0.45" />
+        </filter>
+      </defs>
+      <circle cx="20" cy="20" r="17" fill="url(#cg)" filter="url(#csh)" />
+      <ellipse cx="14" cy="14" rx="5" ry="3" fill="rgba(255,255,255,0.42)" transform="rotate(-30 14 14)" />
+    </svg>
+  )
+}
+
+// ── HubView ───────────────────────────────────────────────────────────────
 
 function HubView({
   games,
@@ -286,9 +264,11 @@ function HubView({
   )
 }
 
-// ── Vue Jeu (Cochonnet) ───────────────────────────────────────────────────
+// ── GameView – immersive 3D pétanque scene ────────────────────────────────
 
-type GamePhase = 'idle' | 'throwing' | 'landing' | 'result'
+type GamePhase = 'idle' | 'windup' | 'airborne' | 'landing' | 'rolling' | 'stopped' | 'result'
+
+const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms))
 
 function GameView({
   game,
@@ -299,101 +279,151 @@ function GameView({
   initialCredits: number
   onBack:         (remaining: number) => void
 }) {
-  const [phase,     setPhase]     = useState<GamePhase>('idle')
-  const [result,    setResult]    = useState<PlayResult | null>(null)
-  const [credits,   setCredits]   = useState(initialCredits)
-  const throwingRef = useRef(false)
-  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [phase,    setPhase]    = useState<GamePhase>('idle')
+  const [result,   setResult]   = useState<PlayResult | null>(null)
+  const [credits,  setCredits]  = useState(initialCredits)
+  const [showDust, setShowDust] = useState(false)
 
-  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+  // Ball position state
+  const [bLeft,   setBLeft]   = useState('50%')
+  const [bTop,    setBTop]    = useState('83%')
+  const [bScale,  setBScale]  = useState(1.0)
+  const [bRotate, setBRotate] = useState(0)
+  const [bTrans,  setBTrans]  = useState('none')
+
+  const throwingRef = useRef(false)
 
   const handleThrow = useCallback(async () => {
     if (throwingRef.current || credits < 1) return
     throwingRef.current = true
-    setPhase('throwing')
     setResult(null)
 
-    // API + animation minimale (2.5s) en parallèle
-    const [apiResult] = await Promise.all([
-      fetch('/api/games/play', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ gameId: game.id }),
-      }).then(r => r.json() as Promise<PlayResult>),
-      new Promise<void>(res => setTimeout(res, 2500)),
-    ])
+    // Start API call immediately so result is ready during rolling phase
+    const apiPromise = fetch('/api/games/play', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ gameId: game.id }),
+    }).then(r => r.json() as Promise<PlayResult>)
+
+    // ── WINDUP (0.35s) ──────────────────────────────────────────────────
+    setPhase('windup')
+    setBTrans('left 0.35s ease-out, top 0.35s ease-out, transform 0.35s ease-out')
+    setBTop('89%')
+    setBScale(1.14)
+    await sleep(350)
+
+    // ── AIRBORNE – up to apex (0.7s) ────────────────────────────────────
+    setPhase('airborne')
+    setBTrans('left 1.55s cubic-bezier(0.4,0,0.6,1), top 0.72s cubic-bezier(0.22,1,0.36,1), transform 1.55s ease-in-out')
+    setBTop('7%')
+    setBScale(0.34)
+
+    await sleep(720)
+
+    // ── AIRBORNE – down to landing zone (0.83s) ──────────────────────────
+    setBTrans('left 0.85s cubic-bezier(0.55,0.06,0.68,0.19), top 0.85s cubic-bezier(0.55,0.06,0.68,0.19), transform 0.85s ease-in')
+    setBTop('57%')
+    setBScale(0.66)
+
+    await sleep(850)
+
+    // ── LANDING + dust (0.5s) ────────────────────────────────────────────
+    setPhase('landing')
+    setShowDust(true)
+    await sleep(500)
+    setShowDust(false)
+
+    // ── ROLLING toward cochonnet (1.5s) ──────────────────────────────────
+    setPhase('rolling')
+    setBTrans('left 1.5s ease-in-out, top 1.5s ease-in-out, transform 1.5s ease-in-out')
+    setBTop('47%')
+    setBScale(0.56)
+    setBRotate(720)
+
+    // Wait for both rolling animation and API response
+    const [apiResult] = await Promise.all([apiPromise, sleep(1500)])
 
     if (!apiResult.error) {
       setCredits(apiResult.creditsRemaining)
     }
     setResult(apiResult)
-    setPhase('landing')
 
-    // Confettis jackpot / gros lot
-    if (apiResult.result === 'jackpot' || apiResult.result === 'gros') {
+    // ── FINAL POSITION based on result (0.85s) ───────────────────────────
+    const pos = RESULT_POS[apiResult.result] ?? RESULT_POS['perdu']
+    setBTrans('left 0.85s cubic-bezier(0.34,1.56,0.64,1), top 0.85s cubic-bezier(0.34,1.56,0.64,1), transform 0.85s ease-out')
+    setBLeft(`${pos.x}%`)
+    setBTop(`${pos.y}%`)
+    setBScale(pos.s)
+    setBRotate(pos.x >= 50 ? 1080 : 900)
+
+    await sleep(850)
+
+    // ── STOPPED (0.5s) ───────────────────────────────────────────────────
+    setPhase('stopped')
+    // subtle settle bounce
+    setBTrans('transform 0.18s ease-out')
+    setBScale(pos.s * 1.08)
+    await sleep(180)
+    setBScale(pos.s)
+    await sleep(320)
+
+    // Confettis for good results
+    if (!apiResult.error && ['jackpot', 'gros', 'super'].includes(apiResult.result)) {
       import('canvas-confetti').then(({ default: confetti }) => {
         confetti({
-          particleCount: 140,
-          spread: 90,
-          origin: { y: 0.5 },
-          colors: ['#E8622A', '#FFD700', '#ffffff', '#a855f7', '#22c55e'],
+          particleCount: apiResult.result === 'jackpot' ? 200 : 120,
+          spread:        90,
+          origin:        { y: 0.45 },
+          colors:        ['#E8622A', '#FFD700', '#ffffff', '#a855f7', '#22c55e'],
         })
       })
     }
 
-    timerRef.current = setTimeout(() => {
-      setPhase('result')
-      throwingRef.current = false
-    }, 700)
+    setPhase('result')
+    throwingRef.current = false
   }, [game.id, credits])
 
   function handlePlayAgain() {
-    if (timerRef.current) clearTimeout(timerRef.current)
     setPhase('idle')
     setResult(null)
+    setBLeft('50%')
+    setBTop('83%')
+    setBScale(1.0)
+    setBRotate(0)
+    setBTrans('none')
     throwingRef.current = false
   }
 
-  const isThrown   = phase !== 'idle'
-  const showResult = phase === 'result'
-  const landedZone = (phase === 'landing' || phase === 'result') && !result?.error
-    ? result?.result
-    : undefined
+  const suspenseText: Record<GamePhase, string | null> = {
+    idle:     null,
+    windup:   null,
+    airborne: "C'est parti ! 🎱",
+    landing:  'Atterrissage...',
+    rolling:  'Ça roule...',
+    stopped:  null,
+    result:   null,
+  }
+
+  const isJackpotStop = phase === 'stopped' && result?.result === 'jackpot'
 
   return (
     <div
       className="flex flex-col"
       style={{
-        height:     'calc(100vh - 112px)', // minus bottom nav
-        background: 'radial-gradient(ellipse at 50% 55%, #16a34a 0%, #14532d 60%, #052e16 100%)',
-        position:   'relative',
-        overflow:   'hidden',
+        height:   'calc(100vh - 112px)',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
-      {/* Lignes de terrain décoratifs */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        <div className="absolute left-6 right-6 top-[44%] h-px bg-white/8" />
-        <div className="absolute left-6 right-6 bottom-[22%] h-px bg-white/8" />
-        <div
-          className="absolute"
-          style={{
-            left: '15%', right: '15%',
-            top: '22%', bottom: '20%',
-            border: '1px solid rgba(255,255,255,0.07)',
-            borderRadius: '50%',
-          }}
-        />
-      </div>
-
-      {/* ── Header ── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div
         className="flex-none flex items-center justify-between px-5 pt-12 pb-3 z-10"
-        style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(10px)' }}
+        style={{ background: 'rgba(8,18,38,0.88)', backdropFilter: 'blur(14px)' }}
       >
         <button
           onClick={() => onBack(credits)}
           className="w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}
+          style={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2.5} className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -409,7 +439,7 @@ function GameView({
 
         <div
           className="px-3 py-1.5 rounded-xl min-w-[60px] text-center"
-          style={{ backgroundColor: credits > 0 ? '#E8622A' : 'rgba(255,255,255,0.15)' }}
+          style={{ backgroundColor: credits > 0 ? '#E8622A' : 'rgba(255,255,255,0.14)' }}
         >
           <p className="text-white text-xs font-bold">
             {credits} crédit{credits !== 1 ? 's' : ''}
@@ -417,74 +447,171 @@ function GameView({
         </div>
       </div>
 
-      {/* ── Terrain + Jeu ── */}
-      <div className="flex-1 flex flex-col items-center justify-center pb-2 relative z-10">
-        {/* Cible */}
-        <div>
-          <Target result={landedZone} />
+      {/* ── Scene ───────────────────────────────────────────────────────── */}
+      <div className="flex-1 relative overflow-hidden">
+
+        {/* Sky */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(180deg, #5B9EC9 0%, #A8D5E2 28%, #C8DEB8 42%, #D4B578 50%, #C4955A 62%, #A87838 78%, #8C6028 100%)',
+          }}
+        />
+
+        {/* Sun */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            right: '18%', top: '5%',
+            width: 54, height: 54,
+            background: 'radial-gradient(circle, rgba(255,245,160,0.92) 0%, rgba(255,218,80,0.45) 48%, transparent 72%)',
+            borderRadius: '50%',
+          }}
+        />
+
+        {/* Tree silhouette – left */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: 0, top: '22%', bottom: 0, width: '20%',
+            background: 'linear-gradient(to bottom, rgba(20,48,28,0.55), rgba(20,48,28,0.82))',
+            clipPath: 'polygon(0 100%, 18% 48%, 36% 62%, 52% 18%, 68% 52%, 84% 32%, 100% 0, 100% 100%)',
+          }}
+        />
+
+        {/* Tree silhouette – right */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            right: 0, top: '20%', bottom: 0, width: '22%',
+            background: 'linear-gradient(to bottom, rgba(20,48,28,0.55), rgba(20,48,28,0.82))',
+            clipPath: 'polygon(0 0, 16% 28%, 32% 12%, 50% 48%, 68% 22%, 84% 42%, 100% 48%, 100% 100%, 0 100%)',
+          }}
+        />
+
+        {/* Perspective lane lines on the ground */}
+        <div
+          className="absolute pointer-events-none"
+          style={{ top: '44%', left: 0, right: 0, bottom: 0 }}
+        >
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="50" y1="0" x2="28" y2="100" stroke="rgba(255,255,255,0.10)" strokeWidth="0.6" />
+            <line x1="50" y1="0" x2="72" y2="100" stroke="rgba(255,255,255,0.10)" strokeWidth="0.6" />
+            <line x1="50" y1="0" x2="12" y2="100" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+            <line x1="50" y1="0" x2="88" y2="100" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+            <line x1="33"  y1="28" x2="67"  y2="28" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+            <line x1="24"  y1="55" x2="76"  y2="55" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+          </svg>
         </div>
 
-        {/* Fil de trajectoire pendant le lancer */}
-        {phase === 'throwing' && (
+        {/* Cochonnet at far end */}
+        <div
+          className="absolute z-[5]"
+          style={{
+            left: '50%', top: '37%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
+          <Cochonnet glow={isJackpotStop} />
+        </div>
+
+        {/* Ball shadow (only when on ground) */}
+        {phase !== 'airborne' && phase !== 'windup' && (
           <div
-            className="w-0.5 bg-gradient-to-b from-transparent to-white/40"
-            style={{ height: 56, marginTop: -4 }}
+            className="absolute pointer-events-none rounded-full z-[8]"
+            style={{
+              left:       bLeft,
+              top:        bTop,
+              width:      `${bScale * 36}px`,
+              height:     `${bScale * 10}px`,
+              background: 'rgba(0,0,0,0.22)',
+              transform:  'translate(-50%, 26px)',
+              filter:     'blur(5px)',
+              transition: bTrans,
+            }}
           />
         )}
 
-        {/* Boule */}
+        {/* Dust puff on landing */}
+        {showDust && (
+          <div
+            className="absolute pointer-events-none z-[9]"
+            style={{ left: '50%', top: '57%', transform: 'translate(-50%, -50%)' }}
+          >
+            <div style={{
+              width: 70, height: 35,
+              borderRadius: '50%',
+              background: 'radial-gradient(ellipse, rgba(200,162,105,0.75) 0%, rgba(200,162,105,0) 70%)',
+              animation: 'dust-expand 0.55s ease-out both',
+            }} />
+          </div>
+        )}
+
+        {/* The Ball */}
         <div
+          className="absolute pointer-events-none z-10"
           style={{
-            marginTop: phase === 'throwing' ? 0 : 24,
-            transition: isThrown
-              ? 'transform 2s cubic-bezier(0.15, 0.05, 0.25, 1.15), margin-top 2s cubic-bezier(0.15, 0.05, 0.25, 1.15)'
-              : 'none',
-            transform: isThrown ? 'translateY(-188px)' : 'translateY(0px)',
-            zIndex: showResult ? 2 : 8,
+            left:       bLeft,
+            top:        bTop,
+            transform:  `translate(-50%, -50%) scale(${bScale}) rotate(${bRotate}deg)`,
+            transition: bTrans,
+            willChange: 'left, top, transform',
           }}
         >
-          <PetanqueBall size={68} />
+          <MetallicBall size={72} />
         </div>
       </div>
 
-      {/* ── Bouton LANCER / status ── */}
-      <div className="flex-none px-8 pb-8 z-10">
+      {/* ── Bottom: suspense + button ────────────────────────────────────── */}
+      <div
+        className="flex-none px-8 pb-8 pt-4 z-10 flex flex-col items-center justify-center"
+        style={{ minHeight: 100, background: 'rgba(8,18,38,0.72)', backdropFilter: 'blur(10px)' }}
+      >
+        {suspenseText[phase] && (
+          <div className="flex items-center gap-2 mb-4">
+            <p className="text-white/85 font-semibold text-base">{suspenseText[phase]}</p>
+            {phase === 'rolling' && (
+              <span className="flex gap-1 ml-1">
+                {[0, 1, 2].map(i => (
+                  <span
+                    key={i}
+                    style={{
+                      display: 'inline-block',
+                      width: 6, height: 6,
+                      borderRadius: '50%',
+                      background: 'white',
+                      animation: `dot-pulse-kf 1.1s ${i * 0.22}s ease-in-out infinite`,
+                    }}
+                  />
+                ))}
+              </span>
+            )}
+          </div>
+        )}
+
         {phase === 'idle' && (
           <button
             onClick={handleThrow}
             disabled={credits < 1}
-            className="w-full h-16 rounded-2xl font-extrabold text-white text-xl transition active:scale-[0.97] disabled:opacity-50"
-            style={{
-              backgroundColor: '#E8622A',
-              boxShadow:       '0 4px 28px rgba(232,98,42,0.55)',
-            }}
+            className="w-full h-16 rounded-2xl font-extrabold text-white text-xl active:scale-[0.97] disabled:opacity-50 btn-pulse"
+            style={{ backgroundColor: '#E8622A' }}
           >
             🎳 LANCER !
           </button>
         )}
 
-        {phase === 'throwing' && (
-          <div className="h-16 flex items-center justify-center gap-3">
-            <div
-              className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-              style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: 'white' }}
-            />
-            <p className="text-white font-bold text-lg">En vol…</p>
-          </div>
-        )}
-
-        {(phase === 'landing' || phase === 'result') && (
+        {phase !== 'idle' && phase !== 'result' && (
           <div className="h-16" />
         )}
       </div>
 
-      {/* ── Overlay résultat ── */}
-      {showResult && result && (
+      {/* ── Result overlay ───────────────────────────────────────────────── */}
+      {phase === 'result' && result && (
         <div
           className="absolute inset-0 z-20 flex flex-col items-end justify-end px-5 pb-10 pt-32"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}
         >
-          <div className="w-full bg-white rounded-3xl p-6 shadow-2xl">
+          <div className="w-full bg-white rounded-3xl p-6 shadow-2xl result-in">
             {result.error ? (
               <div className="text-center">
                 <p className="text-4xl mb-3">❌</p>
@@ -585,7 +712,7 @@ export default function JeuxPage() {
       .from('games')
       .select('id, name, description, event_name')
       .eq('is_active', true)
-      .not('name', 'is', null) // n'affiche que les jeux avec un nom (exclut les anciens games QR)
+      .not('name', 'is', null)
       .order('created_at', { ascending: false })
 
     const gamesList = gamesData ?? []
