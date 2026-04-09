@@ -45,18 +45,60 @@ const ZONES = [
   { id: 'jackpot', r:  18, inner:   0, fill: '#EAB308' },
 ]
 
-// Position finale de la boule dans le conteneur de la cible (280 × 280 px, centre = 140, 140)
-// Distances vérifiées pour être dans la bonne zone (échelle : 1 unité SVG ≈ 1.077 px)
-const RESULT_BALL_POS: Record<string, { x: number; y: number }> = {
-  jackpot: { x: 140, y: 140 },  // r = 0   ∈ jackpot (< 19 px)
-  gros:    { x: 165, y: 125 },  // r ≈ 29  ∈ gros    (19–37 px)
-  super:   { x: 102, y: 168 },  // r ≈ 47  ∈ super   (37–54 px)
-  bon:     { x: 195, y: 105 },  // r ≈ 65  ∈ bon     (54–70 px)
-  petit:   { x:  70, y: 192 },  // r ≈ 87  ∈ petit   (70–99 px)
-  perdu:   { x: 235, y: 195 },  // r ≈ 110 ∈ perdu   (99–140 px)
+// Position finale de la boule dans la scène (% du conteneur).
+// La cible est centrée à (50%, 40%). Offsets en px calculés pour
+// chaque zone, convertis en % d'écran 390 px.
+// Zone radii à l'écran (scale 0.22, SVG 280px sur 260 unités) :
+//   jackpot≈4px, gros≈8px, super≈12px, bon≈15px, petit≈22px, perdu>31px
+const RESULT_FINAL: Record<string, { x: number; y: number; s: number }> = {
+  jackpot: { x: 50.0, y: 40.0, s: 0.18 },  // centre exact (cochonnet)
+  gros:    { x: 51.5, y: 39.6, s: 0.18 },  // 6 px à droite du centre
+  super:   { x: 47.4, y: 40.7, s: 0.18 },  // 10 px à gauche
+  bon:     { x: 53.6, y: 39.3, s: 0.18 },  // 14 px à droite
+  petit:   { x: 44.9, y: 41.2, s: 0.18 },  // 20 px à gauche
+  perdu:   { x: 59.0, y: 40.5, s: 0.19 },  // 35 px à droite (hors cible)
 }
 
 const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms))
+
+// ── SVG : sapin (arbre de pétanque) ───────────────────────────────────────────
+
+function PineTree({ height }: { height: number }) {
+  const w = Math.round(height * 0.52)
+  const cx = w / 2
+  const trunkH = Math.round(height * 0.18)
+  const crownH = height - trunkH
+  const trunkW = Math.max(5, Math.round(w * 0.16))
+
+  return (
+    <svg width={w} height={height} viewBox={`0 0 ${w} ${height}`} style={{ display: 'block' }}>
+      {/* Tronc */}
+      <rect
+        x={cx - trunkW / 2} y={crownH}
+        width={trunkW} height={trunkH}
+        fill="#7A4A18" rx={2}
+      />
+      {/* Couronne : 3 étages de triangles */}
+      <polygon
+        points={`${cx},${crownH * 0.10} ${0},${crownH * 0.72} ${w},${crownH * 0.72}`}
+        fill="#1A5C0A"
+      />
+      <polygon
+        points={`${cx},${crownH * 0.02} ${w * 0.09},${crownH * 0.50} ${w * 0.91},${crownH * 0.50}`}
+        fill="#208010"
+      />
+      <polygon
+        points={`${cx},0 ${w * 0.20},${crownH * 0.32} ${w * 0.80},${crownH * 0.32}`}
+        fill="#289A14"
+      />
+      {/* Reflet clair sur le tier du haut */}
+      <polygon
+        points={`${cx},0 ${cx - w * 0.08},${crownH * 0.18} ${cx + w * 0.08},${crownH * 0.18}`}
+        fill="rgba(255,255,255,0.10)"
+      />
+    </svg>
+  )
+}
 
 // ── SVG : boule métallique ─────────────────────────────────────────────────────
 
@@ -90,15 +132,8 @@ function MetallicBall({ size = 72 }: { size?: number }) {
 
 // ── SVG : cible (zones proportionnelles) ──────────────────────────────────────
 
-function TargetSVG({
-  size = 280,
-  highlightZone,
-}: {
-  size?: number
-  highlightZone?: string
-}) {
+function TargetSVG({ size = 280, highlightZone }: { size?: number; highlightZone?: string }) {
   const hz = highlightZone ? ZONES.find(z => z.id === highlightZone) : null
-
   return (
     <svg width={size} height={size} viewBox="-130 -130 260 260" style={{ display: 'block' }}>
       <defs>
@@ -110,20 +145,16 @@ function TargetSVG({
           <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.3" />
         </filter>
       </defs>
-
       {/* Zones extérieur → intérieur */}
       {ZONES.map(z => <circle key={z.id} r={z.r} fill={z.fill} />)}
-
-      {/* Séparateurs blancs */}
+      {/* Séparateurs */}
       {ZONES.map(z => (
         <circle key={z.id + '-s'} r={z.r} fill="none" stroke="rgba(255,255,255,0.35)" strokeWidth={1.5} />
       ))}
-
       {/* Cochonnet */}
       <circle r={9} fill="white" filter="url(#tg-drop)" />
       <circle r={5} fill="#E8622A" />
       <ellipse cx="-2" cy="-2.5" rx="2" ry="1.2" fill="rgba(255,255,255,0.55)" />
-
       {/* Zone gagnante illuminée */}
       {hz && (
         <circle
@@ -131,7 +162,7 @@ function TargetSVG({
           fill="none"
           stroke="white"
           strokeWidth={hz.r - hz.inner}
-          strokeOpacity={0.45}
+          strokeOpacity={0.48}
           filter="url(#tg-glow)"
           style={{ animation: 'zone-pulse-kf 1s ease-in-out infinite' }}
         />
@@ -143,29 +174,20 @@ function TargetSVG({
 // ── HubView ────────────────────────────────────────────────────────────────────
 
 function HubView({
-  games,
-  credits,
-  onPlay,
+  games, credits, onPlay,
 }: {
-  games:   Game[]
-  credits: Record<string, number>
-  onPlay:  (game: Game) => void
+  games: Game[]; credits: Record<string, number>; onPlay: (game: Game) => void
 }) {
   const hasAnyCredits = games.some(g => (credits[g.id] ?? 0) > 0)
-
   return (
     <div className="min-h-screen bg-gray-50">
-      <div
-        className="px-5 pt-14 pb-6"
-        style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}
-      >
+      <div className="px-5 pt-14 pb-6"
+        style={{ background: 'linear-gradient(160deg, #1D3550 0%, #2E5A8A 100%)' }}>
         <p className="text-sm text-white/50 font-medium">Mini-jeux</p>
         <h1 className="text-2xl font-extrabold text-white mt-0.5">🎮 Jeux BDE</h1>
         <p className="text-sm text-white/60 mt-1">Joue et gagne des lots à la buvette !</p>
       </div>
-
       <div className="px-5 py-5 space-y-6 pb-24">
-
         {hasAnyCredits && (
           <section>
             <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>🎟️ Mes crédits</h2>
@@ -180,16 +202,13 @@ function HubView({
                       {g.event_name && <p className="text-xs text-gray-400">{g.event_name}</p>}
                     </div>
                     <span className="text-2xl font-extrabold px-3 py-1 rounded-xl"
-                      style={{ backgroundColor: '#E8622A15', color: '#E8622A' }}>
-                      {c}
-                    </span>
+                      style={{ backgroundColor: '#E8622A15', color: '#E8622A' }}>{c}</span>
                   </div>
                 )
               })}
             </div>
           </section>
         )}
-
         <section>
           <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Jeux disponibles</h2>
           {games.length === 0 ? (
@@ -238,7 +257,6 @@ function HubView({
             </div>
           )}
         </section>
-
         <section>
           <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Comment jouer ?</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -255,7 +273,6 @@ function HubView({
             ))}
           </div>
         </section>
-
         <section>
           <h2 className="text-base font-bold mb-3" style={{ color: '#1D3550' }}>Lots à gagner 🏆</h2>
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -274,35 +291,29 @@ function HubView({
 
 // ── GameView ───────────────────────────────────────────────────────────────────
 //
-// Phase 1 – Vue lanceur  : terrain en longueur, boule proche, cible au fond
-// Phase 2 – Vue du dessus : caméra depuis le cochonnet, boule qui arrive
+//  Vue unique en perspective depuis derrière le joueur.
+//  L'API est appelée avant le lancer — la trajectoire va DIRECTEMENT
+//  vers la zone correspondant au résultat, sans détour.
 //
 // ──────────────────────────────────────────────────────────────────────────────
 
-type GamePhase = 'idle' | 'launching' | 'camera' | 'rolling' | 'stopped' | 'result'
+type GamePhase = 'idle' | 'loading' | 'windup' | 'arc1' | 'arc2' | 'stopped' | 'result'
 
 function GameView({
-  game,
-  initialCredits,
-  onBack,
+  game, initialCredits, onBack,
 }: {
-  game: Game
-  initialCredits: number
-  onBack: (remaining: number) => void
+  game: Game; initialCredits: number; onBack: (remaining: number) => void
 }) {
   const [phase,         setPhase]         = useState<GamePhase>('idle')
   const [result,        setResult]        = useState<PlayResult | null>(null)
   const [credits,       setCredits]       = useState(initialCredits)
   const [highlightZone, setHighlightZone] = useState<string | undefined>()
 
-  // Vue lanceur — état de la boule
-  const [lBottom, setLBottom] = useState('10%')   // distance depuis le bas en %
-  const [lScale,  setLScale]  = useState(1.0)
-
-  // Vue du dessus — position de la boule (pixels dans conteneur 280×280)
-  const [tX,     setTX]     = useState(140)
-  const [tY,     setTY]     = useState(-50)
-  const [tTrans, setTTrans] = useState('none')
+  // État de la boule (position absolue dans la scène)
+  const [bLeft,  setBLeft]  = useState('50%')
+  const [bTop,   setBTop]   = useState('83%')
+  const [bScale, setBScale] = useState(1.0)
+  const [bTrans, setBTrans] = useState('none')
 
   const throwingRef = useRef(false)
 
@@ -312,55 +323,58 @@ function GameView({
     setResult(null)
     setHighlightZone(undefined)
 
-    // Reset position vue du dessus (au-dessus de la cible)
-    setTX(140)
-    setTY(-50)
-    setTTrans('none')
+    // ─── 1. Appel API AVANT l'animation ──────────────────────────────────
+    setPhase('loading')
 
-    // Appel API dès le départ
-    const apiPromise = fetch('/api/games/play', {
+    const apiResult = await fetch('/api/games/play', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ gameId: game.id }),
     }).then(r => r.json() as Promise<PlayResult>)
 
-    // ─── PHASE : lancer (0.5 s) ─────────────────────────────────────────
-    // La boule rétrécit et remonte vers la cible
-    setPhase('launching')
-    setLBottom('62%')
-    setLScale(0.10)
-    await sleep(500)
-
-    // ─── PHASE : transition caméra (0.3 s) ──────────────────────────────
-    setPhase('camera')
-    await sleep(300)
-
-    // ─── PHASE : roulement ──────────────────────────────────────────────
-    setPhase('rolling')
-    await sleep(60) // laisser le DOM valider la position initiale
-
-    // La boule descend vers le centre (ease-in = accélération)
-    setTTrans('left 1.8s ease-in, top 1.8s ease-in')
-    setTX(140)
-    setTY(140) // vers le centre de la cible
-
-    // Attente API + animation de roulement
-    const [apiResult] = await Promise.all([apiPromise, sleep(1800)])
-
     if (!apiResult.error) setCredits(apiResult.creditsRemaining)
     setResult(apiResult)
 
-    // La boule décélère vers sa position finale (ease-out)
-    const pos = RESULT_BALL_POS[apiResult.result] ?? RESULT_BALL_POS.perdu
-    setTTrans('left 1.0s cubic-bezier(0.2,1,0.35,1), top 1.0s cubic-bezier(0.2,1,0.35,1)')
-    setTX(pos.x)
-    setTY(pos.y)
-    await sleep(1000)
+    // Position finale connue dès maintenant
+    const pos    = RESULT_FINAL[apiResult.result] ?? RESULT_FINAL.perdu
+    // L'apex de l'arc pointe dans la direction du résultat dès le départ
+    const apexX  = 50 + 0.40 * (pos.x - 50)
 
-    // ─── PHASE : arrêt ──────────────────────────────────────────────────
+    // ─── 2. Élan (0.28 s) ────────────────────────────────────────────────
+    setPhase('windup')
+    setBTrans('left 0.28s ease-out, top 0.28s ease-out, transform 0.28s ease-out')
+    setBLeft(`${apexX * 0.15 + 50 * 0.85}%`) // léger déhanchement vers la cible
+    setBTop('86%')
+    setBScale(1.08)
+    await sleep(280)
+
+    // ─── 3. Arc montant vers l'apex (0.70 s) ─────────────────────────────
+    setPhase('arc1')
+    setBTrans('left 0.70s ease-out, top 0.70s cubic-bezier(0.18,0.9,0.38,1), transform 0.70s ease-out')
+    setBLeft(`${apexX}%`)
+    setBTop('19%')
+    setBScale(0.27)
+    await sleep(700)
+
+    // ─── 4. Arc descendant vers la zone finale (1.05 s) ──────────────────
+    setPhase('arc2')
+    setBTrans('left 1.05s ease-in, top 1.05s ease-in, transform 1.05s ease-in')
+    setBLeft(`${pos.x}%`)
+    setBTop(`${pos.y}%`)
+    setBScale(pos.s)
+    await sleep(1050)
+
+    // ─── 5. Atterrissage (micro-rebond) ──────────────────────────────────
     setPhase('stopped')
     setHighlightZone(apiResult.result)
+    setBTrans('transform 0.14s ease-out')
+    setBScale(pos.s * 1.14)
+    await sleep(140)
+    setBTrans('transform 0.12s ease-in')
+    setBScale(pos.s)
+    await sleep(120)
 
+    // Confettis pour les bons résultats
     if (!apiResult.error && ['jackpot', 'gros', 'super'].includes(apiResult.result)) {
       import('canvas-confetti').then(({ default: confetti }) => {
         confetti({
@@ -372,9 +386,9 @@ function GameView({
       })
     }
 
-    await sleep(750)
+    await sleep(680)
 
-    // ─── PHASE : résultat ───────────────────────────────────────────────
+    // ─── 6. Résultat ─────────────────────────────────────────────────────
     setPhase('result')
     throwingRef.current = false
   }, [game.id, credits])
@@ -383,270 +397,213 @@ function GameView({
     setPhase('idle')
     setResult(null)
     setHighlightZone(undefined)
-    setLBottom('10%')
-    setLScale(1.0)
-    setTX(140)
-    setTY(-50)
-    setTTrans('none')
+    setBLeft('50%')
+    setBTop('83%')
+    setBScale(1.0)
+    setBTrans('none')
     throwingRef.current = false
   }
 
-  const isLaunchView = phase === 'idle' || phase === 'launching'
-  const isTopView    = !isLaunchView
+  const targetGlow = highlightZone
+    ? `drop-shadow(0 0 14px ${ZONES.find(z => z.id === highlightZone)?.fill ?? 'white'})`
+    : 'drop-shadow(0 3px 12px rgba(0,0,0,0.5))'
 
-  const SUSPENSE: Partial<Record<GamePhase, string>> = {
-    launching: "C'est parti ! 🎱",
-    camera:    "C'est parti ! 🎱",
-    rolling:   'Ça roule...',
-  }
+  // Arbres gauche — (left, baseY en %, hauteur en px)
+  const leftTrees  = [
+    { l: '2%',  by: 33, h: 32 },
+    { l: '1%',  by: 37, h: 46 },
+    { l: '4%',  by: 43, h: 64 },
+    { l: '1%',  by: 52, h: 88 },
+  ]
+  // Arbres droite — mêmes hauteurs, miroir
+  const rightTrees = [
+    { r: '2%',  by: 33, h: 32 },
+    { r: '1%',  by: 37, h: 46 },
+    { r: '4%',  by: 43, h: 64 },
+    { r: '1%',  by: 52, h: 88 },
+  ]
 
   return (
-    <div
-      className="flex flex-col"
-      style={{ height: 'calc(100vh - 112px)', position: 'relative', overflow: 'hidden' }}
-    >
+    <div className="flex flex-col"
+      style={{ height: 'calc(100vh - 112px)', position: 'relative', overflow: 'hidden' }}>
+
       {/* ─── EN-TÊTE ────────────────────────────────────────────────────── */}
-      <div
-        className="flex-none flex items-center justify-between px-5 pt-12 pb-3 z-20"
-        style={{ background: 'rgba(6,14,32,0.92)', backdropFilter: 'blur(16px)' }}
-      >
-        <button
-          onClick={() => onBack(credits)}
+      <div className="flex-none flex items-center justify-between px-5 pt-12 pb-3 z-20"
+        style={{ background: 'rgba(6,14,30,0.92)', backdropFilter: 'blur(16px)' }}>
+        <button onClick={() => onBack(credits)}
           className="w-9 h-9 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.14)' }}
-        >
+          style={{ backgroundColor: 'rgba(255,255,255,0.14)' }}>
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
             stroke="white" strokeWidth={2.5} className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
-
         <div className="text-center">
           <h1 className="text-white font-extrabold text-sm">🎳 {game.name}</h1>
           {game.event_name && <p className="text-white/40 text-xs mt-0.5">{game.event_name}</p>}
         </div>
-
-        <div
-          className="px-3 py-1.5 rounded-xl min-w-[60px] text-center"
-          style={{ backgroundColor: credits > 0 ? '#E8622A' : 'rgba(255,255,255,0.14)' }}
-        >
+        <div className="px-3 py-1.5 rounded-xl min-w-[60px] text-center"
+          style={{ backgroundColor: credits > 0 ? '#E8622A' : 'rgba(255,255,255,0.14)' }}>
           <p className="text-white text-xs font-bold">{credits} crédit{credits !== 1 ? 's' : ''}</p>
         </div>
       </div>
 
-      {/* ─── SCÈNE (deux calques superposés) ────────────────────────────── */}
+      {/* ─── SCÈNE ──────────────────────────────────────────────────────── */}
       <div className="flex-1 relative overflow-hidden z-10">
 
-        {/* ══════════════════════════════════════════════════════
-            VUE LANCEUR – perspective derrière le joueur
-            ══════════════════════════════════════════════════════ */}
-        <div
-          style={{
-            position: 'absolute', inset: 0,
-            opacity: isLaunchView ? 1 : 0,
-            transition: 'opacity 0.32s ease',
-            pointerEvents: isLaunchView ? 'auto' : 'none',
-          }}
-        >
-          {/* Ciel → sol (dégradé réaliste) */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: `linear-gradient(
-              180deg,
-              #4A8FC4 0%,
-              #72B8D0 24%,
-              #A8C898 38%,
-              #D2B888 46%,
-              #C8A268 56%,
-              #A87C38 72%,
-              #8A6228 100%
-            )`,
-          }} />
+        {/* Ciel → sol */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `linear-gradient(
+            180deg,
+            #2878C8 0%,
+            #4898D8 12%,
+            #78B8E0 23%,
+            #A8D4EC 33%,
+            #C8D8B8 38%,
+            #D8C080 43%,
+            #C8A060 52%,
+            #B08038 68%,
+            #8A6228 84%,
+            #6E4C1C 100%
+          )`,
+        }} />
 
-          {/* Bande d'horizon (arbres floutés) */}
-          <div style={{
-            position: 'absolute', left: 0, right: 0, top: '34%', height: '12%',
-            background: 'rgba(24,50,22,0.30)',
-            filter: 'blur(8px)',
-            pointerEvents: 'none',
-          }} />
+        {/* Soleil */}
+        <div style={{
+          position: 'absolute', right: '16%', top: '5%',
+          width: 54, height: 54,
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, #FFFAAA 0%, #FFE035 42%, rgba(255,215,45,0.22) 70%, transparent 100%)',
+          boxShadow: '0 0 52px 26px rgba(255,225,70,0.20)',
+          pointerEvents: 'none',
+        }} />
 
-          {/* Lignes de perspective SVG */}
-          <svg
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}
-            viewBox="0 0 100 100" preserveAspectRatio="none"
-          >
-            {/* Point de fuite : (50, 43) */}
-            {/* Bordures extérieures de la piste */}
-            <line x1="9"  y1="100" x2="50" y2="43" stroke="rgba(100,72,36,0.70)" strokeWidth="0.9" />
-            <line x1="91" y1="100" x2="50" y2="43" stroke="rgba(100,72,36,0.70)" strokeWidth="0.9" />
-            {/* Lignes centrales de guidage */}
-            <line x1="30" y1="100" x2="50" y2="43" stroke="rgba(200,168,120,0.18)" strokeWidth="0.4" />
-            <line x1="70" y1="100" x2="50" y2="43" stroke="rgba(200,168,120,0.18)" strokeWidth="0.4" />
-            {/* Marqueurs de distance horizontaux */}
-            <line x1="32" y1="57"  x2="68" y2="57"  stroke="rgba(200,168,120,0.14)" strokeWidth="0.35" />
-            <line x1="23" y1="68"  x2="77" y2="68"  stroke="rgba(200,168,120,0.12)" strokeWidth="0.30" />
-            <line x1="14" y1="81"  x2="86" y2="81"  stroke="rgba(200,168,120,0.10)" strokeWidth="0.25" />
-          </svg>
-
-          {/* Bordure bois gauche (trapèze) */}
-          <div style={{
-            position: 'absolute', left: 0, top: '43%', bottom: 0, width: '10%',
-            background: 'linear-gradient(90deg, #5A3818, #7A5232 55%, #9A7052)',
-            clipPath: 'polygon(0 0, 100% 26%, 100% 100%, 0 100%)',
-          }} />
-
-          {/* Bordure bois droite */}
-          <div style={{
-            position: 'absolute', right: 0, top: '43%', bottom: 0, width: '10%',
-            background: 'linear-gradient(270deg, #5A3818, #7A5232 55%, #9A7052)',
-            clipPath: 'polygon(0 26%, 100% 0, 100% 100%, 0 100%)',
-          }} />
-
-          {/* Cible au loin (perspective : aplatie + petite) */}
-          <div style={{
+        {/* Arbres gauche */}
+        {leftTrees.map((t, i) => (
+          <div key={i} style={{
             position: 'absolute',
-            left: '50%', top: '42%',
-            transform: 'translate(-50%, -50%) scale(0.19) scaleY(0.48)',
-            transformOrigin: 'center center',
-            filter: 'drop-shadow(0 3px 12px rgba(0,0,0,0.50))',
+            left: t.l,
+            top: `calc(${t.by}% - ${t.h}px)`,
             pointerEvents: 'none',
           }}>
-            <TargetSVG size={280} />
+            <PineTree height={t.h} />
           </div>
+        ))}
 
-          {/* Ombre de la boule au sol */}
-          <div style={{
+        {/* Arbres droite (miroir horizontal via scaleX=-1) */}
+        {rightTrees.map((t, i) => (
+          <div key={i} style={{
             position: 'absolute',
-            left: '50%',
-            bottom: `calc(${lBottom} - 12px)`,
-            width:  `${80 * lScale}px`,
-            height: `${24 * lScale}px`,
-            transform: 'translate(-50%, 50%)',
-            background: 'radial-gradient(ellipse, rgba(0,0,0,0.35) 0%, transparent 70%)',
-            filter: 'blur(3px)',
-            transition: phase === 'launching' ? 'all 0.5s ease-in' : 'none',
-            zIndex: 5,
-            pointerEvents: 'none',
-          }} />
-
-          {/* La boule (vue lanceur) */}
-          <div style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: lBottom,
-            transform: `translate(-50%, 50%) scale(${lScale})`,
-            transformOrigin: 'center bottom',
-            transition: phase === 'launching' ? 'bottom 0.5s ease-in, transform 0.5s ease-in' : 'none',
-            filter: 'drop-shadow(0 8px 28px rgba(0,0,0,0.65))',
-            zIndex: 10,
+            right: t.r,
+            top: `calc(${t.by}% - ${t.h}px)`,
+            transform: 'scaleX(-1)',
             pointerEvents: 'none',
           }}>
-            <MetallicBall size={104} />
+            <PineTree height={t.h} />
           </div>
+        ))}
+
+        {/* Bordure bois gauche (trapèze perspective) */}
+        <div style={{
+          position: 'absolute', left: 0, top: '43%', bottom: 0, width: '10%',
+          background: 'linear-gradient(90deg, #4E3010 0%, #704822 55%, #927050 100%)',
+          clipPath: 'polygon(0 0, 100% 24%, 100% 100%, 0 100%)',
+        }} />
+
+        {/* Bordure bois droite */}
+        <div style={{
+          position: 'absolute', right: 0, top: '43%', bottom: 0, width: '10%',
+          background: 'linear-gradient(270deg, #4E3010 0%, #704822 55%, #927050 100%)',
+          clipPath: 'polygon(0 24%, 100% 0, 100% 100%, 0 100%)',
+        }} />
+
+        {/* Cible au fond (petite + aplatie pour l'effet perspective) */}
+        <div style={{
+          position: 'absolute',
+          left: '50%', top: '40%',
+          transform: 'translate(-50%, -50%) scale(0.22) scaleY(0.44)',
+          transformOrigin: 'center center',
+          filter: targetGlow,
+          transition: 'filter 0.5s ease',
+          zIndex: 5,
+          pointerEvents: 'none',
+        }}>
+          <TargetSVG size={280} highlightZone={highlightZone} />
         </div>
 
-        {/* ══════════════════════════════════════════════════════
-            VUE DU DESSUS – depuis le cochonnet, boule qui arrive
-            ══════════════════════════════════════════════════════ */}
-        <div
-          style={{
-            position: 'absolute', inset: 0,
-            opacity: isTopView ? 1 : 0,
-            transition: 'opacity 0.32s ease',
-            pointerEvents: isTopView ? 'auto' : 'none',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            gap: 0,
-          }}
-        >
-          {/* Sol sablonneux */}
-          <div style={{ position: 'absolute', inset: 0,
-            background: 'linear-gradient(155deg, #C8A868 0%, #D4B890 35%, #C49868 65%, #B08040 100%)',
-          }} />
-
-          {/* Grains de sable subtils */}
+        {/* Ombre de la boule sur le sol (uniquement quand au sol) */}
+        {(phase === 'idle' || phase === 'loading' || phase === 'windup' || phase === 'stopped') && (
           <div style={{
-            position: 'absolute', inset: 0, opacity: 0.08,
-            backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)',
-            backgroundSize: '9px 9px',
+            position: 'absolute',
+            left: bLeft,
+            top: bTop,
+            width: `${86 * bScale}px`,
+            height: `${26 * bScale}px`,
+            transform: 'translate(-50%, 18px)',
+            background: 'radial-gradient(ellipse, rgba(0,0,0,0.28) 0%, transparent 70%)',
+            filter: 'blur(3px)',
+            zIndex: 4,
+            transition: bTrans,
             pointerEvents: 'none',
           }} />
+        )}
 
-          {/* Conteneur cible + boule */}
-          <div style={{ position: 'relative', width: 280, height: 280, zIndex: 5, flexShrink: 0 }}>
-            {/* Ombre de la cible sur le sol */}
-            <div style={{
-              position: 'absolute', inset: -8,
-              borderRadius: '50%',
-              background: 'rgba(0,0,0,0.12)',
-              filter: 'blur(12px)',
-            }} />
-
-            <TargetSVG size={280} highlightZone={highlightZone} />
-
-            {/* Boule (visible dès la phase rolling) */}
-            {(phase === 'rolling' || phase === 'stopped' || phase === 'result') && (
-              <div style={{
-                position: 'absolute',
-                left: tX,
-                top:  tY,
-                transform: 'translate(-50%, -50%)',
-                transition: tTrans,
-                zIndex: 15,
-                filter: 'drop-shadow(0 5px 16px rgba(0,0,0,0.60))',
-                willChange: 'left, top',
-              }}>
-                <MetallicBall size={46} />
-              </div>
-            )}
-          </div>
+        {/* La boule */}
+        <div style={{
+          position: 'absolute',
+          left: bLeft,
+          top: bTop,
+          transform: `translate(-50%, -50%) scale(${bScale})`,
+          transition: bTrans,
+          zIndex: 10,
+          filter: 'drop-shadow(0 8px 28px rgba(0,0,0,0.65))',
+          willChange: 'left, top, transform',
+          pointerEvents: 'none',
+        }}>
+          <MetallicBall size={100} />
         </div>
       </div>
 
-      {/* ─── ZONE BASSE : texte de suspense + bouton ────────────────────── */}
-      <div
-        className="flex-none px-6 pb-8 pt-4 flex flex-col items-center justify-center z-10"
-        style={{ minHeight: 96, background: 'rgba(6,14,32,0.86)', backdropFilter: 'blur(14px)' }}
-      >
-        {SUSPENSE[phase] && (
-          <div className="flex items-center gap-1.5 mb-3">
-            <p className="text-white/85 font-semibold text-base">{SUSPENSE[phase]}</p>
-            {phase === 'rolling' && (
-              <span className="flex gap-1 ml-1">
-                {[0, 1, 2].map(i => (
-                  <span
-                    key={i}
-                    style={{
-                      display: 'inline-block', width: 6, height: 6,
-                      borderRadius: '50%', background: 'rgba(255,255,255,0.85)',
-                      animation: `dot-pulse-kf 1.1s ${i * 0.22}s ease-in-out infinite`,
-                    }}
-                  />
-                ))}
-              </span>
-            )}
-          </div>
-        )}
+      {/* ─── ZONE BASSE : bouton / statut ───────────────────────────────── */}
+      <div className="flex-none px-6 pb-8 pt-4 flex flex-col items-center justify-center z-10"
+        style={{ minHeight: 92, background: 'rgba(6,14,30,0.88)', backdropFilter: 'blur(14px)' }}>
 
         {phase === 'idle' && (
           <button
             onClick={handleThrow}
             disabled={credits < 1}
             className="w-full h-16 rounded-2xl font-extrabold text-white text-xl active:scale-[0.97] disabled:opacity-50 btn-pulse"
-            style={{ backgroundColor: '#E8622A' }}
-          >
+            style={{ backgroundColor: '#E8622A' }}>
             🎱 LANCER !
           </button>
+        )}
+
+        {phase === 'loading' && (
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: 'rgba(255,255,255,0.25)', borderTopColor: 'white' }} />
+            <p className="text-white/70 font-semibold text-sm">Préparation...</p>
+          </div>
+        )}
+
+        {(phase === 'windup' || phase === 'arc1' || phase === 'arc2') && (
+          <div className="flex items-center gap-1.5">
+            <p className="text-white/85 font-semibold text-base">C&apos;est parti ! 🎱</p>
+          </div>
+        )}
+
+        {phase === 'stopped' && (
+          <div className="flex items-center gap-1.5">
+            <p className="text-white/80 font-semibold text-base">...</p>
+          </div>
         )}
       </div>
 
       {/* ─── OVERLAY RÉSULTAT ───────────────────────────────────────────── */}
       {phase === 'result' && result && (
-        <div
-          className="absolute inset-0 z-30 flex items-end px-5 pb-8"
-          style={{ background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(6px)' }}
-        >
+        <div className="absolute inset-0 z-30 flex items-end px-5 pb-8"
+          style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(6px)' }}>
           <div className="w-full bg-white rounded-3xl p-6 shadow-2xl result-in">
             {result.error ? (
               <div className="text-center">
@@ -660,45 +617,36 @@ function GameView({
               </div>
             ) : (
               <>
-                {/* Résultat principal */}
                 <div className="text-center mb-5">
                   <p className="text-5xl mb-2">{result.emoji}</p>
                   <h2 className="text-2xl font-extrabold"
                     style={{ color: result.result === 'perdu' ? '#DC2626' : result.color }}>
-                    {result.result === 'perdu'
-                      ? 'Raté ! 😢'
-                      : result.result === 'jackpot'
-                        ? '🎉 JACKPOT !'
-                        : 'Bravo !'}
+                    {result.result === 'perdu' ? 'Raté ! 😢'
+                      : result.result === 'jackpot' ? '🎉 JACKPOT !'
+                      : 'Bravo !'}
                   </h2>
                   <p className="text-base font-semibold text-gray-700 mt-1.5">{result.prizeName}</p>
                 </div>
 
-                {/* Coupon gagné */}
                 {result.generatesCoupon && result.couponId && (
                   <div className="rounded-2xl p-3.5 mb-4 flex items-center gap-3"
                     style={{ backgroundColor: '#E8622A0E', border: '1px solid #E8622A25' }}>
                     <span className="text-2xl">🎟️</span>
                     <div>
                       <p className="text-sm font-bold" style={{ color: '#E8622A' }}>Coupon ajouté à ton compte !</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
-                        Montre-le à la buvette pour profiter de ton lot.
-                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Montre-le à la buvette pour profiter de ton lot.</p>
                     </div>
                   </div>
                 )}
 
-                {/* Actions */}
                 <div className="space-y-2.5">
                   {result.generatesCoupon && result.couponId && (
-                    <Link
-                      href="/profil"
+                    <Link href="/profil"
                       className="flex items-center justify-center w-full h-12 rounded-2xl font-bold text-white text-sm"
                       style={{ backgroundColor: '#E8622A' }}>
                       Voir mes coupons →
                     </Link>
                   )}
-
                   {credits > 0 ? (
                     <button onClick={handlePlayAgain}
                       className="w-full h-12 rounded-2xl font-bold text-sm border-2 transition active:scale-[0.97]"
@@ -732,7 +680,6 @@ export default function JeuxPage() {
 
   const loadData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-
     const { data: gamesData } = await supabase
       .from('games')
       .select('id, name, description, event_name')
@@ -754,17 +701,12 @@ export default function JeuxPage() {
       for (const c of creditsData ?? []) map[c.game_id] = c.credits
       setCredits(map)
     }
-
     setScreen('hub')
   }, [])
 
   useEffect(() => { loadData() }, [loadData])
 
-  function handlePlay(game: Game) {
-    setActiveGame(game)
-    setScreen('game')
-  }
-
+  function handlePlay(game: Game) { setActiveGame(game); setScreen('game') }
   function handleBack(remaining: number) {
     if (activeGame) setCredits(prev => ({ ...prev, [activeGame.id]: remaining }))
     setActiveGame(null)
@@ -782,13 +724,7 @@ export default function JeuxPage() {
   }
 
   if (screen === 'game' && activeGame) {
-    return (
-      <GameView
-        game={activeGame}
-        initialCredits={credits[activeGame.id] ?? 0}
-        onBack={handleBack}
-      />
-    )
+    return <GameView game={activeGame} initialCredits={credits[activeGame.id] ?? 0} onBack={handleBack} />
   }
 
   return <HubView games={games} credits={credits} onPlay={handlePlay} />
