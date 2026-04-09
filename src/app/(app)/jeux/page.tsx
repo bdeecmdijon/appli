@@ -74,14 +74,21 @@ function piePath(cx: number, cy: number, r: number, startDeg: number, endDeg: nu
   return `M${cx} ${cy} L${s.x.toFixed(2)} ${s.y.toFixed(2)} A${r} ${r} 0 ${large} 1 ${e.x.toFixed(2)} ${e.y.toFixed(2)}Z`
 }
 
-// Calcule la rotation totale (cumulative) pour atterrir dans la section resultId
+// Calcule la rotation totale (cumulative) pour atterrir dans la section resultId.
+//
+// Convention : le SVG dessine les sections avec 0° = haut, sens horaire.
+// CSS rotate(R°) tourne la roue dans le sens horaire.
+// Après rotation R, le pointeur (fixe en haut) pointe vers l'angle θ de la roue
+// tel que  θ + R ≡ 0 (mod 360)  ⟹  R ≡ (360 - θ) mod 360.
+// Il faut donc viser R = (360 - θ) % 360 et non R = θ.
 function getTargetRotation(resultId: string, currentRotation: number): number {
   const sec = WHEEL_SECTIONS.find(s => s.id === resultId) ?? WHEEL_SECTIONS[0]
   const margin = Math.max(sec.sweep * 0.12, 1.5)
-  const offset = margin + Math.random() * (sec.sweep - margin * 2)
-  const target = sec.start + offset
+  const theta = sec.start + margin + Math.random() * (sec.sweep - margin * 2)
+  // Rotation modulo 360 qui amène θ sous le pointeur
+  const targetMod = (360 - theta % 360 + 360) % 360
   const cur = ((currentRotation % 360) + 360) % 360
-  let delta = target - cur
+  let delta = targetMod - cur
   if (delta < 0) delta += 360
   const spins = 5 + Math.floor(Math.random() * 3)
   return currentRotation + delta + spins * 360
