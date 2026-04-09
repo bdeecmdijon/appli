@@ -69,8 +69,9 @@ export default function RegisterPage() {
     formation: '',
     autre_ecole: '',
   })
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading,    setLoading]    = useState(false)
+  const [error,      setError]      = useState<string | null>(null)
+  const [emailSent,  setEmailSent]  = useState(false)
 
   const isECM = form.ecole === 'ECM'
 
@@ -89,94 +90,121 @@ export default function RegisterPage() {
     setError(null)
     setLoading(true)
 
-    const fullName   = `${form.prenom.trim()} ${form.nom.trim()}`.trim()
-    const phoneClean = form.phone.replace(/[\s.]/g, '')
-    if (!/^(06|07)\d{8}$/.test(phoneClean)) {
-      setError('Numéro invalide. Format attendu : 06 12 34 56 78 ou 07 12 34 56 78')
-      setLoading(false)
-      return
-    }
+    try {
+      const fullName   = `${form.prenom.trim()} ${form.nom.trim()}`.trim()
+      const phoneClean = form.phone.replace(/[\s.]/g, '')
+      if (!/^(06|07)\d{8}$/.test(phoneClean)) {
+        setError('Numéro invalide. Format attendu : 06 12 34 56 78 ou 07 12 34 56 78')
+        return
+      }
 
-    // 1. Créer le compte auth
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: form.email,
-      password: form.password,
-      options: {
-        data: { full_name: fullName },
-      },
-    })
+      // 1. Créer le compte auth
+      console.log('[Register] signUp →', form.email)
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { full_name: fullName },
+        },
+      })
+      console.log('[Register] signUp result →', { userId: data.user?.id, hasSession: !!data.session, signUpError })
 
-    if (signUpError) {
-      setError(signUpError.message)
-      setLoading(false)
-      return
-    }
+      if (signUpError) {
+        setError(signUpError.message)
+        return
+      }
 
-    const userId = data.user?.id
-    if (!userId) {
-      setError('Erreur lors de la création du compte.')
-      setLoading(false)
-      return
-    }
+      const userId = data.user?.id
+      if (!userId) {
+        setError('Erreur lors de la création du compte.')
+        return
+      }
 
-    // 2. Forcer la session dans les cookies AVANT l'upsert
-    // Sans ça, auth.uid() est null côté RLS et l'upsert est bloqué silencieusement
-    if (data.session) {
+      // 2. Confirmation email requise (session absente = Supabase attend la vérification)
+      if (!data.session) {
+        console.log('[Register] no session → email confirmation required')
+        setEmailSent(true)
+        return
+      }
+
+      // 3. Forcer la session dans les cookies AVANT l'upsert
       await supabase.auth.setSession({
         access_token:  data.session.access_token,
         refresh_token: data.session.refresh_token,
       })
-    }
 
-    // 3. Sauvegarder le profil complet
-    const profilePayload = {
-      id:             userId,
-      email:          form.email,
-      full_name:      fullName,
-      phone:          phoneClean       || null,
-      ecole:          form.ecole       || null,
-      formation:      form.formation   || null,
-      autre_ecole:    form.autre_ecole || null,
-      points_balance: 10,   // cadeau de bienvenue
-    }
-
-    console.log('[Register] saving profile →', profilePayload)
-
-    // Tentative 1 : upsert (INSERT or UPDATE selon si le trigger a déjà créé la ligne)
-    const { error: upsertError } = await supabase
-      .from('profiles')
-      .upsert(profilePayload, { onConflict: 'id' })
-
-    if (upsertError) {
-      console.warn('[Register] upsert failed, trying UPDATE →', {
-        message: upsertError.message, code: upsertError.code,
-      })
-      // Tentative 2 : update direct (le trigger handle_new_user a déjà créé la ligne)
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({
-          full_name:   fullName,
-          phone:       phoneClean       || null,
-          ecole:       form.ecole       || null,
-          formation:   form.formation   || null,
-          autre_ecole: form.autre_ecole || null,
-        })
-        .eq('id', userId)
-
-      if (updateError) {
-        console.error('[Register] UPDATE also failed →', {
-          message: updateError.message, code: updateError.code,
-          details: updateError.details, hint: updateError.hint,
-        })
-        // On continue quand même — le compte est créé, le profil peut être complété plus tard
-      } else {
-        console.log('[Register] UPDATE succeeded')
+      // 4. Sauvegarder le profil complet
+      const profilePayload = {
+        id:             userId,
+        email:          form.email,
+        full_name:      fullName,
+        phone:          phoneClean       || null,
+        ecole:          form.ecole       || null,
+        formation:      form.formation   || null,
+        autre_ecole:    form.autre_ecole || null,
+        points_balance: 10,
       }
-    } else {
-      console.log('[Register] upsert succeeded')
-    }
+      console.log('[Register] saving profile →', profilePayload)
 
-    window.location.href = '/accueil'
+      const { error: upsertError } = await supabase
+        .from('profiles')
+        .upsert(profilePayload, { onConflict: 'id' })
+
+      if (upsertError) {
+        console.warn('[Register] upsert failed, trying UPDATE →', upsertError.message)
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            full_name:   fullName,
+            phone:       phoneClean       || null,
+            ecole:       form.ecole       || null,
+            formation:   form.formation   || null,
+            autre_ecole: form.autre_ecole || null,
+          })
+          .eq('id', userId)
+        if (updateError) {
+          console.error('[Register] UPDATE also failed →', updateError.message)
+          // On continue quand même — compte créé, profil complétable plus tard
+        } else {
+          console.log('[Register] UPDATE succeeded')
+        }
+      } else {
+        console.log('[Register] upsert succeeded')
+      }
+
+      // 5. Redirection — le compte est prêt
+      window.location.href = '/accueil'
+
+    } catch (err) {
+      console.error('[Register] unexpected error →', err)
+      setError('Une erreur inattendue est survenue. Réessaie.')
+    } finally {
+      // Garantit que le loading s'arrête dans tous les cas (sauf navigation)
+      setLoading(false)
+    }
+  }
+
+  // ── Écran "confirme ton email" ────────────────────────────────────────────
+  if (emailSent) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8 text-center">
+        <div className="text-6xl mb-6">📬</div>
+        <h1 className="text-2xl font-extrabold mb-2" style={{ color: '#1D3550' }}>
+          Vérifie ta boîte mail !
+        </h1>
+        <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+          Un lien de confirmation t&apos;a été envoyé à <strong>{form.email}</strong>.<br />
+          Clique dessus pour activer ton compte, puis connecte-toi.
+        </p>
+        <button
+          onClick={() => router.push('/auth/login')}
+          className="w-full max-w-xs h-12 rounded-2xl font-bold text-white"
+          style={{ backgroundColor: '#E8622A' }}
+        >
+          Aller à la connexion
+        </button>
+      </div>
+    )
   }
 
   return (
