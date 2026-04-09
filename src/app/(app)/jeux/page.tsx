@@ -29,7 +29,7 @@ interface PlayResult {
 const PRIZES_PREVIEW = [
   { zone: 'jackpot', emoji: '🟡', prize: 'Sandwich + boisson offerts' },
   { zone: 'gros',    emoji: '🟣', prize: '1 pinte offerte' },
-  { zone: 'super',   emoji: '🟢', prize: '1 bière 25cl offerte' },
+  { zone: 'super',   emoji: '🟢', prize: '1 bière 25cl ou Ricard offert(e)' },
   { zone: 'bon',     emoji: '🔵', prize: '1 soda offert' },
   { zone: 'petit',   emoji: '🟠', prize: '-1€ sur ta prochaine commande' },
 ]
@@ -38,12 +38,12 @@ const PRIZES_PREVIEW = [
 // prob% × 3.6 = degrés de balayage
 const WHEEL_SECTIONS = (() => {
   const raw = [
-    { id: 'perdu',   prob: 50, color: '#DC2626', textColor: '#fff',    label: 'Perdu'   },
-    { id: 'petit',   prob: 25, color: '#F97316', textColor: '#fff',    label: '-1€'     },
-    { id: 'bon',     prob: 10, color: '#3B82F6', textColor: '#fff',    label: 'Soda'    },
-    { id: 'super',   prob:  8, color: '#22C55E', textColor: '#fff',    label: 'Bière'   },
-    { id: 'gros',    prob:  5, color: '#A855F7', textColor: '#fff',    label: 'Pinte'   },
-    { id: 'jackpot', prob:  2, color: '#EAB308', textColor: '#1D3550', label: 'JACKPOT' },
+    { id: 'perdu',   prob: 50, color: '#DC2626', textColor: '#fff',    label: 'Perdu 😢'   },
+    { id: 'petit',   prob: 25, color: '#F97316', textColor: '#fff',    label: '-1€'        },
+    { id: 'bon',     prob: 10, color: '#3B82F6', textColor: '#fff',    label: 'Soda 🥤'   },
+    { id: 'super',   prob:  8, color: '#22C55E', textColor: '#fff',    label: 'Bière 🍺'  },
+    { id: 'gros',    prob:  5, color: '#A855F7', textColor: '#fff',    label: 'Pinte 🍻'  },
+    { id: 'jackpot', prob:  2, color: '#EAB308', textColor: '#1D3550', label: 'JACKPOT 🎉' },
   ]
   let cum = 0
   return raw.map(s => {
@@ -400,8 +400,8 @@ function GameView({
               filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
             }}>
               <svg width="26" height="22" viewBox="0 0 26 22">
-                <polygon points="13,22 0,0 26,0" fill="#E8622A" />
-                <polygon points="13,22 0,0 26,0" fill="none" stroke="white" strokeWidth={1.5} />
+                <polygon points="13,22 0,0 26,0" fill="#1D3550" />
+                <polygon points="13,22 0,0 26,0" fill="none" stroke="#E8622A" strokeWidth={2} />
               </svg>
             </div>
 
