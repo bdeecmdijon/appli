@@ -30,8 +30,6 @@ interface Profile {
   current_streak: number
 }
 
-const MOCK_STATS = { events_count: 3, games_count: 2 }
-
 // ── Paliers ────────────────────────────────────────────────────────────────
 
 const TIERS = [
@@ -617,21 +615,6 @@ export default function ProfilPage() {
               </svg>
               <span className="text-[10px] font-bold" style={{ color: '#1D3550' }}>QR Code</span>
             </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="rounded-2xl bg-white shadow-sm border border-gray-100 p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Mes stats</p>
-          <div className="flex gap-4">
-            <div className="flex-1 rounded-xl py-4 flex flex-col items-center" style={{ backgroundColor: '#1D3550' + '10' }}>
-              <span className="text-3xl font-extrabold" style={{ color: '#1D3550' }}>{MOCK_STATS.events_count}</span>
-              <span className="text-xs text-gray-500 mt-1 text-center">Événements<br />participés</span>
-            </div>
-            <div className="flex-1 rounded-xl py-4 flex flex-col items-center" style={{ backgroundColor: '#E8622A' + '10' }}>
-              <span className="text-3xl font-extrabold" style={{ color: '#E8622A' }}>{MOCK_STATS.games_count}</span>
-              <span className="text-xs text-gray-500 mt-1 text-center">Soirées<br />jouées</span>
-            </div>
           </div>
         </div>
 

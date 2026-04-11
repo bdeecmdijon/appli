@@ -147,66 +147,83 @@ function RewardsSheet({
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl">
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full bg-gray-200" />
-        </div>
-        <div className="px-5 pt-2 pb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-extrabold" style={{ color: '#1D3550' }}>
-              Dépenser mes points
-            </h2>
-            <span className="text-sm font-bold" style={{ color: '#E8622A' }}>
-              {points.toLocaleString('fr-FR')} pts
-            </span>
+      {/* Overlay plein écran */}
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} />
+
+      {/* Modal centré verticalement */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-5 pointer-events-none">
+        <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden pointer-events-auto">
+
+          {/* En-tête */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100">
+            <div>
+              <h2 className="text-lg font-extrabold" style={{ color: '#1D3550' }}>
+                Dépenser mes points
+              </h2>
+              <p className="text-sm font-bold mt-0.5" style={{ color: '#E8622A' }}>
+                {points.toLocaleString('fr-FR')} pts disponibles
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: '#F3F4F6' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="#6B7280" strokeWidth={2.5} className="w-4 h-4">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
 
-          {rewards.length === 0 ? (
-            <p className="text-center text-gray-400 text-sm py-6">
-              Aucune récompense disponible pour le moment.
-            </p>
-          ) : (
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
-              {rewards.map(reward => {
-                const canAfford = points >= reward.points_required
-                return (
-                  <div
-                    key={reward.id}
-                    className="rounded-2xl border p-4 flex items-center gap-4"
-                    style={{
-                      borderColor:     canAfford ? '#E8622A40' : '#E5E7EB',
-                      backgroundColor: canAfford ? '#E8622A06' : '#F9FAFB',
-                    }}
-                  >
-                    <span className="text-3xl flex-shrink-0">{reward.emoji}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold leading-tight" style={{ color: '#1D3550' }}>
-                        {reward.name}
-                      </p>
-                      {reward.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate">{reward.description}</p>
-                      )}
-                      <p className="text-sm font-extrabold mt-1" style={{ color: canAfford ? '#E8622A' : '#9CA3AF' }}>
-                        {reward.points_required} pts
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setActiveReward(reward)}
-                      disabled={!canAfford}
-                      className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition active:scale-[0.96] disabled:cursor-not-allowed"
+          {/* Contenu scrollable */}
+          <div className="px-5 py-4 max-h-[60vh] overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+            {rewards.length === 0 ? (
+              <p className="text-center text-gray-400 text-sm py-8">
+                Aucune récompense disponible pour le moment.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {rewards.map(reward => {
+                  const canAfford = points >= reward.points_required
+                  return (
+                    <div
+                      key={reward.id}
+                      className="rounded-2xl border p-4 flex items-center gap-4"
                       style={{
-                        backgroundColor: canAfford ? '#E8622A' : '#E5E7EB',
-                        color:           canAfford ? '#FFFFFF'  : '#9CA3AF',
+                        borderColor:     canAfford ? '#E8622A40' : '#E5E7EB',
+                        backgroundColor: canAfford ? '#E8622A06' : '#F9FAFB',
                       }}
                     >
-                      {canAfford ? 'Échanger' : 'Insuffisant'}
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                      <span className="text-3xl flex-shrink-0">{reward.emoji}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold leading-tight" style={{ color: '#1D3550' }}>
+                          {reward.name}
+                        </p>
+                        {reward.description && (
+                          <p className="text-xs text-gray-400 mt-0.5 truncate">{reward.description}</p>
+                        )}
+                        <p className="text-sm font-extrabold mt-1" style={{ color: canAfford ? '#E8622A' : '#9CA3AF' }}>
+                          {reward.points_required} pts
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setActiveReward(reward)}
+                        disabled={!canAfford}
+                        className="flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition active:scale-[0.96] disabled:cursor-not-allowed"
+                        style={{
+                          backgroundColor: canAfford ? '#E8622A' : '#E5E7EB',
+                          color:           canAfford ? '#FFFFFF'  : '#9CA3AF',
+                        }}
+                      >
+                        {canAfford ? 'Échanger' : 'Insuffisant'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
@@ -266,7 +283,7 @@ export default function AccueilPage() {
       if (eventsRes.error) throw eventsRes.error
       if (rewardsRes.error) console.error('[Rewards] Erreur query:', rewardsRes.error)
       console.log('[Rewards] data:', rewardsRes.data)
-      setEvents(eventsRes.data && eventsRes.data.length > 0 ? eventsRes.data : MOCK_EVENTS)
+      setEvents(eventsRes.data ?? [])
       setRewards(rewardsRes.data ?? [])
     } catch (err) {
       console.error(err)
@@ -642,7 +659,14 @@ export default function AccueilPage() {
           </div>
 
           {events.length === 0 ? (
-            <p className="text-center py-10 text-gray-400 text-sm">Aucun événement prévu.</p>
+            <div className="rounded-2xl border border-gray-100 bg-white py-8 px-5 text-center"
+              style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
+              <p className="text-3xl mb-2">📅</p>
+              <p className="font-bold text-sm" style={{ color: '#1D3550' }}>Aucun événement pour le moment</p>
+              <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                Votre BDE prépare de nouvelles surprises,<br />restez connectés !
+              </p>
+            </div>
           ) : (
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-5 px-5" style={{ scrollbarWidth: 'none' }}>
               {events.map((event, idx) => {

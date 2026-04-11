@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
+// ── Mettre à true pour afficher le placeholder "bientôt" ──────────────────────
+const GAME_COMING_SOON = true
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface Game {
@@ -621,6 +624,32 @@ export default function JeuxPage() {
     if (activeGame) setCredits(prev => ({ ...prev, [activeGame.id]: remaining }))
     setActiveGame(null)
     setScreen('hub')
+  }
+
+  if (GAME_COMING_SOON) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-8 text-center pb-28"
+        style={{ background: 'linear-gradient(160deg, #1D3550 0%, #0F1E38 100%)' }}>
+        {/* Orbe décoratif */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full opacity-10 pointer-events-none"
+          style={{ background: 'radial-gradient(circle, #E8622A, transparent)' }} />
+
+        <div className="text-7xl mb-6 relative z-10">🎮</div>
+        <h1 className="text-2xl font-extrabold text-white mb-3 relative z-10">
+          Un jeu arrive bientôt !
+        </h1>
+        <p className="text-white/60 text-sm leading-relaxed relative z-10">
+          Un jeu exclusif sera débloqué<br />lors du prochain événement BDE.<br />
+          <span className="text-white/80 font-semibold">Restez connectés ! 👀</span>
+        </p>
+
+        {/* Badge décoratif */}
+        <div className="mt-8 px-5 py-2.5 rounded-full relative z-10"
+          style={{ backgroundColor: 'rgba(232,98,42,0.18)', border: '1px solid rgba(232,98,42,0.35)' }}>
+          <p className="text-sm font-bold" style={{ color: '#E8622A' }}>🎟️ BDE ECM Dijon</p>
+        </div>
+      </div>
+    )
   }
 
   if (screen === 'loading') {
