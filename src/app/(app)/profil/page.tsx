@@ -28,6 +28,7 @@ interface Profile {
   student_code:   string | null
   role:           string | null
   current_streak: number
+  is_bde_member:  boolean
 }
 
 // ── Paliers ────────────────────────────────────────────────────────────────
@@ -272,6 +273,7 @@ export default function ProfilPage() {
             student_code:   'ECM-DEMO01',
             role:           null,
             current_streak: 0,
+            is_bde_member:  false,
           })
           setLoading(false)
           return
@@ -282,7 +284,7 @@ export default function ProfilPage() {
         // Requête principale — toutes les colonnes nécessaires
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('full_name, phone, formation, ecole, autre_ecole, points_balance, student_code, role, current_streak')
+          .select('full_name, phone, formation, ecole, autre_ecole, points_balance, student_code, role, current_streak, is_bde_member')
           .eq('id', user.id)
           .single()
 
@@ -299,6 +301,7 @@ export default function ProfilPage() {
           student_code:   profileData?.student_code   ?? null,
           role:           profileData?.role           ?? null,
           current_streak: profileData?.current_streak ?? 0,
+          is_bde_member:  profileData?.is_bde_member  ?? false,
         }
 
         setProfile(built)
@@ -363,6 +366,7 @@ export default function ProfilPage() {
           student_code:   'ECM-DEMO01',
           role:           null,
           current_streak: 0,
+          is_bde_member:  false,
         })
       } finally {
         setLoading(false)
@@ -502,6 +506,14 @@ export default function ProfilPage() {
             <p className="text-sm text-white/60 mt-0.5">{displayFormation(profile)}</p>
             {profile.phone && (
               <p className="text-xs text-white/40 mt-0.5">{profile.phone}</p>
+            )}
+            {profile.is_bde_member && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mt-2"
+                style={{ backgroundColor: '#E8622A', color: '#ffffff' }}
+              >
+                ⭐ Adhérent BDE
+              </div>
             )}
           </>
         ) : (

@@ -11,6 +11,10 @@ import { FORMATIONS_ECM } from '@/lib/formations'
 
 const ECOLES = ['ECM', 'Autre école']
 
+function normalize(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
+
 // ── Composant champ select réutilisable ────────────────────────────────────
 
 function SelectField({
@@ -133,7 +137,27 @@ export default function RegisterPage() {
         refresh_token: data.session.refresh_token,
       })
 
-      // 4. Sauvegarder le profil complet
+      // 4. Vérifie si l'utilisateur est adhérent BDE
+      let isBdeMember = false
+      try {
+        const { data: membersData } = await supabase
+          .from('bde_members')
+          .select('first_name, last_name')
+        const normalizedInput = normalize(fullName)
+        for (const m of membersData ?? []) {
+          const a = normalize(`${m.first_name} ${m.last_name}`)
+          const b = normalize(`${m.last_name} ${m.first_name}`)
+          if (a === normalizedInput || b === normalizedInput) {
+            isBdeMember = true
+            break
+          }
+        }
+      } catch (err) {
+        console.warn('[Register] bde_members check failed:', err)
+      }
+      console.log('[Register] is_bde_member:', isBdeMember)
+
+      // 5. Sauvegarder le profil complet
       const profilePayload = {
         id:             userId,
         email:          form.email,
@@ -143,6 +167,7 @@ export default function RegisterPage() {
         formation:      form.formation   || null,
         autre_ecole:    form.autre_ecole || null,
         points_balance: 10,
+        is_bde_member:  isBdeMember,
       }
       console.log('[Register] saving profile →', profilePayload)
 
@@ -172,7 +197,7 @@ export default function RegisterPage() {
         console.log('[Register] upsert succeeded')
       }
 
-      // 5. Redirection — le compte est prêt
+      // 6. Redirection — le compte est prêt
       window.location.href = '/accueil'
 
     } catch (err) {

@@ -22,6 +22,7 @@ interface Student {
   autre_ecole:    string | null
   points_balance: number
   created_at:     string
+  is_bde_member:  boolean
 }
 
 interface PointsEntry {
@@ -59,13 +60,15 @@ function StudentModal({
   onClose: () => void
   onPointsUpdated: (id: string, newBalance: number) => void
 }) {
-  const [history,    setHistory]    = useState<PointsEntry[]>([])
+  const [history,     setHistory]     = useState<PointsEntry[]>([])
   const [histLoading, setHistLoading] = useState(true)
-  const [amount,     setAmount]     = useState<number>(0)
-  const [customAmt,  setCustomAmt]  = useState('')
-  const [reason,     setReason]     = useState('')
-  const [saving,     setSaving]     = useState(false)
-  const [toast,      setToast]      = useState<string | null>(null)
+  const [amount,      setAmount]      = useState<number>(0)
+  const [customAmt,   setCustomAmt]   = useState('')
+  const [reason,      setReason]      = useState('')
+  const [saving,      setSaving]      = useState(false)
+  const [toast,       setToast]       = useState<string | null>(null)
+  const [isMember,    setIsMember]    = useState(student.is_bde_member ?? false)
+  const [togglingMember, setTogglingMember] = useState(false)
 
   const effectiveAmount = customAmt !== '' ? Number(customAmt) : amount
 
@@ -131,6 +134,22 @@ function StudentModal({
     setCustomAmt('')
     setReason('')
     setSaving(false)
+  }
+
+  async function handleToggleMember() {
+    setTogglingMember(true)
+    const newVal = !isMember
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_bde_member: newVal })
+      .eq('id', student.id)
+    if (error) {
+      flash(`Erreur : ${error.message}`)
+    } else {
+      setIsMember(newVal)
+      flash(newVal ? '⭐ Marqué comme adhérent BDE' : 'Statut adhérent retiré')
+    }
+    setTogglingMember(false)
   }
 
   return (
@@ -203,6 +222,32 @@ function StudentModal({
             <span className="text-2xl font-extrabold" style={{ color: '#E8622A' }}>
               {student.points_balance.toLocaleString('fr-FR')} pts
             </span>
+          </div>
+
+          {/* Statut adhérent BDE */}
+          <div
+            className="rounded-2xl p-4 flex items-center justify-between"
+            style={{ backgroundColor: isMember ? '#FFF7ED' : '#F9FAFB', border: `1px solid ${isMember ? '#FED7AA' : '#E5E7EB'}` }}
+          >
+            <div>
+              <p className="text-sm font-bold" style={{ color: '#1D3550' }}>
+                ⭐ Adhérent BDE
+              </p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                {isMember ? 'Badge visible sur le profil étudiant' : 'Non adhérent'}
+              </p>
+            </div>
+            <button
+              onClick={handleToggleMember}
+              disabled={togglingMember}
+              className="relative inline-flex h-7 w-12 items-center rounded-full transition-colors disabled:opacity-50 flex-shrink-0"
+              style={{ backgroundColor: isMember ? '#E8622A' : '#D1D5DB' }}
+            >
+              <span
+                className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform"
+                style={{ transform: isMember ? 'translateX(22px)' : 'translateX(3px)' }}
+              />
+            </button>
           </div>
 
           {/* Attribution de points */}
@@ -341,7 +386,7 @@ function ManualCodeModal({
 
     const { data } = await supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member')
       .eq('student_code', trimmed)
       .single()
 
@@ -427,7 +472,7 @@ function QrScanModal({
 
     const { data } = await supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member')
       .eq('student_code', code)
       .single()
 
@@ -517,7 +562,7 @@ export default function EtudiantsPage() {
 
     let query = supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at', { count: 'exact' })
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member', { count: 'exact' })
       .order(col, { ascending: dir === 'asc' })
       .range(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE - 1)
 
