@@ -471,12 +471,14 @@ export default function ProfilPage() {
 
       {/* Toast sauvegarde */}
       <div
-        className="fixed top-14 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-xl whitespace-nowrap transition-all duration-300"
+        className="fixed top-14 z-50 px-5 py-3 rounded-2xl text-sm font-semibold text-white shadow-xl whitespace-nowrap transition-all duration-300"
         style={{
           backgroundColor: '#1D3550',
-          opacity: saveToast ? 1 : 0,
-          transform: `translateX(-50%) translateY(${saveToast ? '0' : '-8px'})`,
-          pointerEvents: 'none',
+          opacity:          saveToast ? 1 : 0,
+          left:             '50%',
+          transform:        `translateX(-50%) translateY(${saveToast ? '0' : '-8px'})`,
+          pointerEvents:    'none',
+          maxWidth:         'calc(100vw - 40px)',
         }}
       >
         ✅ Profil mis à jour
