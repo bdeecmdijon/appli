@@ -138,24 +138,19 @@ export default function RegisterPage() {
       })
 
       // 4. Vérifie si l'utilisateur est adhérent BDE
-      let isBdeMember = false
+      let isAdherent = false
       try {
-        const { data: membersData } = await supabase
-          .from('bde_members')
-          .select('first_name, last_name')
-        const normalizedInput = normalize(fullName)
-        for (const m of membersData ?? []) {
-          const a = normalize(`${m.first_name} ${m.last_name}`)
-          const b = normalize(`${m.last_name} ${m.first_name}`)
-          if (a === normalizedInput || b === normalizedInput) {
-            isBdeMember = true
-            break
-          }
-        }
+        const { data: adherent } = await supabase
+          .from('adherents')
+          .select('id')
+          .ilike('prenom', form.prenom.trim())
+          .ilike('nom',    form.nom.trim())
+          .maybeSingle()
+        isAdherent = !!adherent
       } catch (err) {
-        console.warn('[Register] bde_members check failed:', err)
+        console.warn('[Register] adherents check failed:', err)
       }
-      console.log('[Register] is_bde_member:', isBdeMember)
+      console.log('[Register] is_adherent:', isAdherent)
 
       // 5. Sauvegarder le profil complet
       const profilePayload = {
@@ -167,7 +162,7 @@ export default function RegisterPage() {
         formation:      form.formation   || null,
         autre_ecole:    form.autre_ecole || null,
         points_balance: 10,
-        is_bde_member:  isBdeMember,
+        is_adherent:    isAdherent,
       }
       console.log('[Register] saving profile →', profilePayload)
 

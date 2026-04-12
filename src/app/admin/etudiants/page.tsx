@@ -22,7 +22,7 @@ interface Student {
   autre_ecole:    string | null
   points_balance: number
   created_at:     string
-  is_bde_member:  boolean
+  is_adherent:  boolean
 }
 
 interface PointsEntry {
@@ -67,7 +67,7 @@ function StudentModal({
   const [reason,      setReason]      = useState('')
   const [saving,      setSaving]      = useState(false)
   const [toast,       setToast]       = useState<string | null>(null)
-  const [isMember,    setIsMember]    = useState(student.is_bde_member ?? false)
+  const [isMember,    setIsMember]    = useState(student.is_adherent ?? false)
   const [togglingMember, setTogglingMember] = useState(false)
 
   const effectiveAmount = customAmt !== '' ? Number(customAmt) : amount
@@ -141,7 +141,7 @@ function StudentModal({
     const newVal = !isMember
     const { error } = await supabase
       .from('profiles')
-      .update({ is_bde_member: newVal })
+      .update({ is_adherent: newVal })
       .eq('id', student.id)
     if (error) {
       flash(`Erreur : ${error.message}`)
@@ -386,7 +386,7 @@ function ManualCodeModal({
 
     const { data } = await supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_adherent')
       .eq('student_code', trimmed)
       .single()
 
@@ -472,7 +472,7 @@ function QrScanModal({
 
     const { data } = await supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member')
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_adherent')
       .eq('student_code', code)
       .single()
 
@@ -562,7 +562,7 @@ export default function EtudiantsPage() {
 
     let query = supabase
       .from('profiles')
-      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_bde_member', { count: 'exact' })
+      .select('id, student_code, full_name, email, phone, formation, ecole, autre_ecole, points_balance, created_at, is_adherent', { count: 'exact' })
       .order(col, { ascending: dir === 'asc' })
       .range(pg * PAGE_SIZE, pg * PAGE_SIZE + PAGE_SIZE - 1)
 

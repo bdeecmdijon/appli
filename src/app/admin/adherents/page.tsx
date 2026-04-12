@@ -6,10 +6,10 @@ import * as XLSX from 'xlsx'
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-interface BdeMember {
+interface Adherent {
   id:         string
-  first_name: string
-  last_name:  string
+  prenom:     string
+  nom:        string
   created_at: string
 }
 
@@ -26,7 +26,7 @@ function formatDate(iso: string) {
 // ── Page ───────────────────────────────────────────────────────────────────
 
 export default function AdherentsPage() {
-  const [members,   setMembers]   = useState<BdeMember[]>([])
+  const [members,   setMembers]   = useState<Adherent[]>([])
   const [loading,   setLoading]   = useState(true)
   const [uploading, setUploading] = useState(false)
   const [deleteId,  setDeleteId]  = useState<string | null>(null)
@@ -41,9 +41,9 @@ export default function AdherentsPage() {
 
   async function fetchMembers() {
     const { data } = await supabase
-      .from('bde_members')
-      .select('id, first_name, last_name, created_at')
-      .order('last_name', { ascending: true })
+      .from('adherents')
+      .select('id, prenom, nom, created_at')
+      .order('nom', { ascending: true })
     setMembers(data ?? [])
     setLoading(false)
   }
@@ -79,17 +79,17 @@ export default function AdherentsPage() {
 
       const inserts = rows
         .map(r => ({
-          first_name: String(r[prenomKey] ?? '').trim(),
-          last_name:  String(r[nomKey]    ?? '').trim(),
+          prenom: String(r[prenomKey] ?? '').trim(),
+          nom:    String(r[nomKey]    ?? '').trim(),
         }))
-        .filter(r => r.first_name && r.last_name)
+        .filter(r => r.prenom && r.nom)
 
       if (inserts.length === 0) {
         flash('Aucune ligne valide dans le fichier.', false)
         return
       }
 
-      const { error } = await supabase.from('bde_members').insert(inserts)
+      const { error } = await supabase.from('adherents').insert(inserts)
       if (error) {
         flash(`Erreur : ${error.message}`, false)
       } else {
@@ -109,7 +109,7 @@ export default function AdherentsPage() {
 
   async function handleDelete(id: string) {
     setDeleteId(id)
-    const { error } = await supabase.from('bde_members').delete().eq('id', id)
+    const { error } = await supabase.from('adherents').delete().eq('id', id)
     if (error) {
       flash(`Erreur : ${error.message}`, false)
     } else {
@@ -123,8 +123,8 @@ export default function AdherentsPage() {
 
   const filtered = search.trim()
     ? members.filter(m =>
-        normalize(`${m.first_name} ${m.last_name}`).includes(normalize(search)) ||
-        normalize(`${m.last_name} ${m.first_name}`).includes(normalize(search))
+        normalize(`${m.prenom} ${m.nom}`).includes(normalize(search)) ||
+        normalize(`${m.nom} ${m.prenom}`).includes(normalize(search))
       )
     : members
 
@@ -226,7 +226,7 @@ export default function AdherentsPage() {
             >
               <div>
                 <p className="text-sm font-bold" style={{ color: '#1D3550' }}>
-                  {m.first_name} {m.last_name.toUpperCase()}
+                  {m.prenom} {m.nom.toUpperCase()}
                 </p>
                 <p className="text-xs text-gray-400 mt-0.5">Ajouté le {formatDate(m.created_at)}</p>
               </div>
