@@ -58,11 +58,6 @@ function getTierIndex(pts: number) {
   return 0
 }
 
-function getTierProgress(pts: number, idx: number) {
-  const t = TIERS[idx]
-  if (!t.max) return 100
-  return Math.min(Math.round(((pts - t.min) / (t.max - t.min)) * 100), 100)
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -418,11 +413,7 @@ export default function AccueilPage() {
     )
   }
 
-  const currentTier = TIERS[tierIdx]
-  const nextTier    = TIERS[tierIdx + 1] ?? null
-  const progress    = getTierProgress(points, tierIdx)
-  const barWidth    = (tierIdx / (TIERS.length - 1)) * 100 + (progress / 100) * (100 / (TIERS.length - 1))
-  const firstName   = getFirstName(profile?.full_name ?? null)
+  const firstName = getFirstName(profile?.full_name ?? null)
 
   return (
     <div className="min-h-screen bg-white">
@@ -512,7 +503,7 @@ export default function AccueilPage() {
 
           <button
             onClick={() => setSheetOpen(true)}
-            className="w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] mb-4 flex items-center justify-center gap-1.5 relative z-10"
+            className="w-full py-3 rounded-2xl text-sm font-bold transition-all duration-200 active:scale-[0.97] flex items-center justify-center gap-1.5 relative z-10"
             style={{
               background:  'linear-gradient(135deg, #E8622A, #FF6B35)',
               boxShadow:   '0 4px 16px rgba(232,98,42,0.4)',
@@ -525,45 +516,6 @@ export default function AccueilPage() {
             </svg>
           </button>
 
-          {/* Barre Bronze / Argent / Or */}
-          <div className="relative z-10">
-            <div className="flex justify-between mb-1.5">
-              {TIERS.map((tier, i) => (
-                <span
-                  key={tier.name}
-                  className="text-xs font-semibold transition-colors duration-300"
-                  style={{ color: i <= tierIdx ? tier.color : 'rgba(255,255,255,0.25)' }}
-                >
-                  {tier.name}
-                </span>
-              ))}
-            </div>
-            <div className="relative h-2.5 rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.12)' }}>
-              <div className="absolute inset-0 flex">
-                {TIERS.slice(0, -1).map((_, i) => (
-                  <div key={i} className="h-full border-r border-white/10" style={{ width: `${100 / (TIERS.length - 1)}%` }} />
-                ))}
-              </div>
-              <div
-                className="absolute left-0 top-0 h-full rounded-full transition-all duration-700"
-                style={{
-                  width:      `${barWidth}%`,
-                  background: `linear-gradient(90deg, ${currentTier.color}99, ${currentTier.color})`,
-                  boxShadow:  `0 0 8px ${currentTier.color}80`,
-                }}
-              />
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className="text-xs text-white/40">
-                Palier <span className="font-bold" style={{ color: currentTier.color }}>{currentTier.name}</span>
-              </span>
-              {nextTier && (
-                <span className="text-xs text-white/40">
-                  <span className="font-bold text-white/70">{nextTier.min - points} pts</span> avant {nextTier.name}
-                </span>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* ── Prochain palier ── */}

@@ -142,17 +142,17 @@ export default function OwlMascot({ partyMode = false }: OwlMascotProps) {
       {/* Speech bubble */}
       {message && (
         <div
-          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-bottom-2 duration-300"
+          className="absolute bottom-full mb-2 left-0 z-20 animate-in fade-in slide-in-from-bottom-2 duration-300"
           style={{ minWidth: '180px', maxWidth: '240px' }}
         >
           <div
-            className="relative px-3 py-2 rounded-2xl text-xs font-semibold text-center leading-snug shadow-lg"
+            className="relative px-3 py-2 rounded-2xl text-xs font-semibold text-left leading-snug shadow-lg"
             style={{ backgroundColor: '#1D3550', color: '#fff' }}
           >
             {message}
             {/* Triangle pointer */}
             <div
-              className="absolute top-full left-1/2 -translate-x-1/2"
+              className="absolute top-full left-4"
               style={{
                 width: 0, height: 0,
                 borderLeft:  '6px solid transparent',

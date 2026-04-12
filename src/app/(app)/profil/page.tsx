@@ -31,20 +31,6 @@ interface Profile {
   is_bde_member:  boolean
 }
 
-// ── Paliers ────────────────────────────────────────────────────────────────
-
-const TIERS = [
-  { name: 'Bronze', min: 0,    max: 500,  color: '#CD7F32' },
-  { name: 'Argent', min: 500,  max: 1500, color: '#A0A0A0' },
-  { name: 'Or',     min: 1500, max: null, color: '#FFD700' },
-]
-
-function getTier(pts: number) {
-  for (let i = TIERS.length - 1; i >= 0; i--) {
-    if (pts >= TIERS[i].min) return TIERS[i]
-  }
-  return TIERS[0]
-}
 
 function getInitials(name: string | null) {
   if (!name) return '?'
@@ -232,9 +218,10 @@ function EditProfileSheet({
 
 export default function ProfilPage() {
   const router = useRouter()
-  const [profile,     setProfile]     = useState<Profile | null>(null)
-  const [userId,      setUserId]      = useState<string | null>(null)
-  const [loading,     setLoading]     = useState(true)
+  const [profile,          setProfile]          = useState<Profile | null>(null)
+  const [userId,           setUserId]           = useState<string | null>(null)
+  const [loading,          setLoading]          = useState(true)
+  const [nextRewardCost,   setNextRewardCost]   = useState<number | null>(null)
   const [loggingOut,    setLoggingOut]    = useState(false)
   const [editOpen,      setEditOpen]      = useState(false)
   const [saveToast,     setSaveToast]     = useState(false)
@@ -305,6 +292,16 @@ export default function ProfilPage() {
         }
 
         setProfile(built)
+
+        // Prochaine récompense disponible
+        const { data: rewardsData } = await supabase
+          .from('rewards')
+          .select('points_required')
+          .eq('is_active', true)
+          .gt('points_required', built.points_balance)
+          .order('points_required', { ascending: true })
+          .limit(1)
+        setNextRewardCost(rewardsData?.[0]?.points_required ?? null)
 
         // Coupons : pending non expirés + utilisés il y a moins de 2h
         const now2h  = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
@@ -466,10 +463,6 @@ export default function ProfilPage() {
     )
   }
 
-  const tier    = getTier(profile?.points_balance ?? 0)
-  const tierIdx = TIERS.indexOf(tier)
-  const nextTier = TIERS[tierIdx + 1] ?? null
-
   return (
     <div className="min-h-screen bg-gray-50">
 
@@ -582,12 +575,6 @@ export default function ProfilPage() {
             <span className="text-base font-medium text-gray-400 mb-1">points</span>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <div
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold text-white"
-              style={{ backgroundColor: tier.color }}
-            >
-              Palier {tier.name}
-            </div>
             {(profile?.current_streak ?? 0) > 1 && (
               <div
                 className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold text-white"
@@ -596,10 +583,12 @@ export default function ProfilPage() {
                 🔥 {profile!.current_streak} soirées d&apos;affilée !
               </div>
             )}
-            {nextTier && (
+            {nextRewardCost !== null ? (
               <span className="text-xs text-gray-400">
-                · {nextTier.min - (profile?.points_balance ?? 0)} pts avant {nextTier.name}
+                Il te manque <span className="font-bold" style={{ color: '#E8622A' }}>{nextRewardCost - (profile?.points_balance ?? 0)} pts</span> avant ta prochaine récompense
               </span>
+            ) : (
+              <span className="text-xs text-gray-400">🎉 Toutes les récompenses disponibles !</span>
             )}
           </div>
         </div>
