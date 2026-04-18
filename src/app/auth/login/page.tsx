@@ -102,12 +102,6 @@ function LoginForm() {
           />
         </div>
 
-        <div className="flex justify-end -mt-1">
-          <Link href="/auth/forgot-password" className="text-xs font-medium" style={{ color: '#E8622A' }}>
-            Mot de passe oublié ?
-          </Link>
-        </div>
-
         <button
           type="submit"
           disabled={loading}
