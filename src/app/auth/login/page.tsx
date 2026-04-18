@@ -3,13 +3,16 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
+  const searchParams = useSearchParams()
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState<string | null>(null)
+  const resetSuccess = searchParams.get('reset') === 'success'
 
   // Redirige quand Supabase confirme la session (cookies écrits)
   useEffect(() => {
@@ -55,6 +58,12 @@ export default function LoginPage() {
 
       {/* Formulaire */}
       <form onSubmit={handleSubmit} className="flex-1 flex flex-col px-6 gap-4">
+        {resetSuccess && (
+          <div className="rounded-xl px-4 py-3 bg-green-50 border border-green-100">
+            <p className="text-sm text-green-700 font-medium">Mot de passe mis à jour ! Connecte-toi.</p>
+          </div>
+        )}
+
         {error && (
           <div className="rounded-xl px-4 py-3 bg-red-50 border border-red-100">
             <p className="text-sm text-red-600 font-medium">{error}</p>
@@ -91,6 +100,12 @@ export default function LoginPage() {
             className="w-full h-12 px-4 rounded-xl border border-gray-200 text-sm outline-none transition focus:border-[#E8622A] focus:ring-2 focus:ring-[#E8622A]/20"
             style={{ color: '#1D3550' }}
           />
+        </div>
+
+        <div className="flex justify-end -mt-1">
+          <Link href="/auth/forgot-password" className="text-xs font-medium" style={{ color: '#E8622A' }}>
+            Mot de passe oublié ?
+          </Link>
         </div>
 
         <button
